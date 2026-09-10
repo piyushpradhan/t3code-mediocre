@@ -77,6 +77,8 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 }
 
 :root {
+  --motion-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --motion-ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --app-scrollbar-width: 6px;
   --appearance-contrast-base: 100%;
   --appearance-contrast-boost: 0%;
@@ -119,6 +121,37 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     --app-scrollbar-thumb-hover: rgb(255 255 255 / 12%);
     --glass-blur: 16px;
     --glass-saturation: 1.08;
+  }
+}
+
+@layer components {
+  .floating-surface-motion {
+    transition-duration: var(--floating-surface-duration, 180ms);
+    transition-property: opacity, scale;
+    transition-timing-function: var(--motion-ease-out);
+  }
+
+  .floating-surface-motion-resizable {
+    transition-property: width, height, opacity, scale;
+  }
+
+  .floating-surface-motion:is([data-ending-style], [data-starting-style]),
+  .floating-surface-motion:has(> :is([data-ending-style], [data-starting-style])) {
+    opacity: 0;
+    scale: 0.98;
+  }
+
+  .floating-surface-motion[data-instant] {
+    transition-duration: 0ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .floating-surface-motion,
+    .floating-surface-motion:is([data-ending-style], [data-starting-style]),
+    .floating-surface-motion:has(> :is([data-ending-style], [data-starting-style])) {
+      scale: 1;
+      transition-property: opacity;
+    }
   }
 }
 

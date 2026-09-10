@@ -2,12 +2,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  SidebarGroupLabel,
   SidebarMenuButton,
   SidebarMenuSubButton,
   SidebarProvider,
   SidebarTrigger,
 } from "./sidebar";
 import { resolveSidebarState } from "./sidebarState";
+import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "../../workspaceTitlebar";
 
 function renderSidebarButton(className?: string) {
   return renderToStaticMarkup(
@@ -36,6 +38,16 @@ describe("sidebar interactive cursors", () => {
     );
 
     expect(html).toContain('data-sidebar-state="collapsed"');
+  });
+
+  it("keeps labels and titlebar insets synchronized with the sidebar collapse", () => {
+    const label = renderToStaticMarkup(<SidebarGroupLabel>Projects</SidebarGroupLabel>);
+
+    for (const classes of [label, COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS]) {
+      expect(classes).toContain("duration-[240ms]");
+      expect(classes).toContain("ease-[var(--motion-ease-drawer)]");
+      expect(classes).toContain("motion-reduce:transition-none");
+    }
   });
 
   it("keeps the sidebar trigger interactive inside Electron drag regions", () => {
