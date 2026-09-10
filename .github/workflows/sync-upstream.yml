@@ -22,11 +22,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Rebase fork commits onto upstream main
+      - name: Sync main from both remotes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add upstream https://github.com/pingdotgg/t3code.git
+          git fetch origin main
           git fetch upstream main
           git checkout -B main origin/main
           git rebase upstream/main
