@@ -282,7 +282,7 @@ function Sidebar({
         <div
           className={cn(
             "relative w-(--sidebar-width) bg-transparent",
-            "[[data-panel-animations=true]_&]:transition-[width] [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out",
+            "[[data-panel-animations=true]_&]:transition-[width] [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-[var(--motion-ease-drawer)] motion-reduce:transition-none",
             "group-data-[collapsible=offcanvas]:w-0",
             "group-data-[side=right]:rotate-180",
             variant === "floating" || variant === "inset"
@@ -294,7 +294,7 @@ function Sidebar({
         <div
           className={cn(
             "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) md:flex",
-            "[[data-panel-animations=true]_&]:transition-[left,right,width] [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out",
+            "[[data-panel-animations=true]_&]:transition-[left,right,width,opacity,translate] [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-[var(--motion-ease-drawer)] motion-reduce:transition-none group-data-[collapsible=offcanvas]:opacity-0 group-data-[side=left]:group-data-[collapsible=offcanvas]:-translate-x-2 group-data-[side=right]:group-data-[collapsible=offcanvas]:translate-x-2",
             side === "left"
               ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
               : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
