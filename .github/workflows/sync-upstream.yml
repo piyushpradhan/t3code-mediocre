@@ -1,12 +1,17 @@
 name: Sync upstream main
 
+# Fork-only. Merges pingdotgg/t3code main into this fork's main.
+# Merge (never rebase) so main is never force-pushed and local clones just `git pull`.
+# On conflict, pushes upstream main to `sync/upstream` and opens a PR to resolve by hand.
+
 on:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "17 */6 * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: sync-upstream
@@ -14,21 +19,42 @@ concurrency:
 
 jobs:
   sync:
-    name: Sync main from pingdotgg/t3code
+    name: Merge pingdotgg/t3code main
+    if: github.repository != 'pingdotgg/t3code'
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
+          ref: main
           fetch-depth: 0
+          # GITHUB_TOKEN cannot push commits that touch .github/workflows, and upstream
+          # edits them often. SYNC_TOKEN: fine-grained PAT with Contents, Workflows and
+          # Pull requests read/write on this repo.
+          token: ${{ secrets.SYNC_TOKEN || github.token }}
 
-      - name: Sync main from both remotes
+      - name: Merge upstream
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git remote add upstream https://github.com/pingdotgg/t3code.git
-          git fetch origin main
-          git fetch upstream main
-          git checkout -B main origin/main
-          git rebase upstream/main
-          git push origin main --force-with-lease
+          git fetch https://github.com/pingdotgg/t3code.git main:refs/remotes/upstream/main
+
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "Already up to date."
+            exit 0
+          fi
+
+          if git merge --no-edit upstream/main; then
+            git push origin main
+            exit 0
+          fi
+
+          git merge --abort
+          git push --force origin upstream/main:refs/heads/sync/upstream
+          if [ -z "$(gh pr list --head sync/upstream --state open --json number -q '.[].number')" ]; then
+            gh pr create --base main --head sync/upstream \
+              --title "chore: merge upstream pingdotgg/t3code" \
+              --body "Automatic upstream merge hit conflicts. Resolve locally: \`git fetch upstream && git merge upstream/main\`, fix conflicts, push main. This PR closes itself once merged."
+          fi
+          echo "::warning::Upstream merge conflicted; see sync/upstream PR."
