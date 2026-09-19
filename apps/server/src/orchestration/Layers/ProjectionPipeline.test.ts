@@ -294,6 +294,70 @@ it.layer(Layer.fresh(makeProjectionPipelinePrefixedTestLayer("t3-branch-pr-proje
         }
       }),
     );
+
+    it.effect("persists the note from thread.meta-updated and clears it with null", () =>
+      Effect.gen(function* () {
+        const projectionPipeline = yield* OrchestrationProjectionPipeline;
+        const eventStore = yield* OrchestrationEventStore;
+        const sql = yield* SqlClient.SqlClient;
+        const now = "2026-01-01T00:00:00.000Z";
+        const threadId = ThreadId.make("thread-note");
+        const projectId = ProjectId.make("project-note");
+        const eventFields = {
+          aggregateKind: "thread" as const,
+          aggregateId: threadId,
+          occurredAt: now,
+          commandId: null,
+          causationEventId: null,
+          correlationId: null,
+          metadata: {},
+        };
+        const created = yield* eventStore.append({
+          ...eventFields,
+          type: "thread.created",
+          eventId: EventId.make("evt-note-created"),
+          payload: {
+            threadId,
+            projectId,
+            title: "Note thread",
+            modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" },
+            runtimeMode: "full-access",
+            interactionMode: "default",
+            branch: null,
+            worktreePath: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+        yield* projectionPipeline.projectEvent(created);
+
+        const setEvent = yield* eventStore.append({
+          ...eventFields,
+          type: "thread.meta-updated",
+          eventId: EventId.make("evt-note-set"),
+          payload: { threadId, note: "<p>Ship it.</p>", updatedAt: now },
+        });
+        yield* projectionPipeline.projectEvent(setEvent);
+
+        let rows = yield* sql<{ readonly note: string | null }>`
+          SELECT note FROM projection_threads WHERE thread_id = ${threadId}
+        `;
+        assert.deepEqual(rows, [{ note: "<p>Ship it.</p>" }]);
+
+        const clearEvent = yield* eventStore.append({
+          ...eventFields,
+          type: "thread.meta-updated",
+          eventId: EventId.make("evt-note-clear"),
+          payload: { threadId, note: null, updatedAt: now },
+        });
+        yield* projectionPipeline.projectEvent(clearEvent);
+
+        rows = yield* sql<{ readonly note: string | null }>`
+          SELECT note FROM projection_threads WHERE thread_id = ${threadId}
+        `;
+        assert.deepEqual(rows, [{ note: null }]);
+      }),
+    );
   },
 );
 

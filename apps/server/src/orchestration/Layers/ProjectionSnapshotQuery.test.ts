@@ -488,6 +488,7 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
           autoSettleDisabledAt: null,
           titleRegeneration: null,
           titleState: null,
+          note: null,
           deletedAt: null,
           messages: [
             {

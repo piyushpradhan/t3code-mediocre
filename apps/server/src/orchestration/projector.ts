@@ -642,6 +642,7 @@ export function projectEvent(
               ...(payload.branchPullRequest !== undefined
                 ? { branchPullRequest: payload.branchPullRequest }
                 : {}),
+              ...(payload.note !== undefined ? { note: payload.note } : {}),
               ...legacyLinkPatch,
               updatedAt: payload.updatedAt,
             }),
