@@ -487,6 +487,7 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
           activeOrderKey: "hq",
           titleRegeneration: null,
           titleState: null,
+          note: null,
           deletedAt: null,
           messages: [
             {

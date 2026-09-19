@@ -2255,3 +2255,36 @@ code {
 .composer-tiptap li[data-checked] > div > p {
   margin: 0;
 }
+
+/* Floating thread note editor: contentEditable rich text pad. */
+.floating-note-editor p,
+.floating-note-editor h3,
+.floating-note-editor ul,
+.floating-note-editor ol,
+.floating-note-editor li {
+  margin: 0;
+}
+
+.floating-note-editor ul,
+.floating-note-editor ol {
+  padding-left: 1.25rem;
+}
+
+.floating-note-editor h3 {
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.floating-note-editor code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: color-mix(in oklab, var(--muted-foreground) 12%, transparent);
+  border-radius: 0.3em;
+  padding: 0.05em 0.25em;
+}
+
+.floating-note-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--color-placeholder);
+  pointer-events: none;
+}

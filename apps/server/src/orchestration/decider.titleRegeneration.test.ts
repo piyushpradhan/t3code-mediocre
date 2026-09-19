@@ -117,4 +117,34 @@ it.layer(NodeServices.layer)("title regeneration decider", (it) => {
       });
     }),
   );
+
+  it.effect("passes a note through thread.meta.update and clears it with null", () =>
+    Effect.gen(function* () {
+      const setResult = yield* decideOrchestrationCommand({
+        command: {
+          type: "thread.meta.update",
+          commandId: CommandId.make("set-note"),
+          threadId: ThreadId.make("thread-1"),
+          note: "<p>Ship the landing page.</p>",
+        },
+        readModel,
+      });
+      const setEvent = Array.isArray(setResult) ? setResult[0] : setResult;
+      expect(setEvent.payload).toMatchObject({
+        note: "<p>Ship the landing page.</p>",
+      });
+
+      const clearResult = yield* decideOrchestrationCommand({
+        command: {
+          type: "thread.meta.update",
+          commandId: CommandId.make("clear-note"),
+          threadId: ThreadId.make("thread-1"),
+          note: null,
+        },
+        readModel,
+      });
+      const clearEvent = Array.isArray(clearResult) ? clearResult[0] : clearResult;
+      expect(clearEvent.payload).toMatchObject({ note: null });
+    }),
+  );
 });
