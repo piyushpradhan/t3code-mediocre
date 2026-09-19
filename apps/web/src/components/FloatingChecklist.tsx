@@ -5,16 +5,19 @@ import { ListChecksIcon, PlusIcon, XIcon } from "lucide-react";
 
 import { cn } from "~/lib/utils";
 
-import { useChecklistStore } from "../checklistStore";
+import { type ChecklistItem, useChecklistStore } from "../checklistStore";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
+
+// Stable empty list: a fresh `[]` from the selector makes zustand re-render forever (React #185).
+const NO_ITEMS: readonly ChecklistItem[] = [];
 
 export function FloatingChecklist({ threadKey }: { threadKey: string | null }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
 
   const items = useChecklistStore((state) =>
-    threadKey ? (state.itemsByThreadKey[threadKey] ?? []) : [],
+    threadKey ? (state.itemsByThreadKey[threadKey] ?? NO_ITEMS) : NO_ITEMS,
   );
   const addItem = useChecklistStore((state) => state.addItem);
   const toggleItem = useChecklistStore((state) => state.toggleItem);
