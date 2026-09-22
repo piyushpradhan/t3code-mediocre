@@ -845,7 +845,7 @@ export const OrchestrationThread = Schema.Struct({
   // Pending-only state. Optional so older servers remain compatible.
   titleRegeneration: Schema.optional(Schema.NullOr(ThreadTitleRegeneration)),
   titleState: Schema.optional(Schema.NullOr(ThreadTitleState)),
-  /** Rich text note bound to the thread. Optional so older servers decode. */
+  /** Markdown note bound to the thread. Optional so older servers decode. */
   note: Schema.optional(Schema.NullOr(TrimmedString)),
   deletedAt: Schema.NullOr(IsoDateTime),
   messages: Schema.Array(OrchestrationMessage),
@@ -1872,7 +1872,7 @@ export const ThreadMetaUpdatedPayload = Schema.Struct({
   // thread.pull-request-linked still decode and replay into the link table.
   linkedPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
   branchPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
-  /** Rich text note bound to the thread. Null clears it. */
+  /** Markdown note bound to the thread. Null clears it. */
   note: Schema.optional(Schema.NullOr(TrimmedString)),
   updatedAt: IsoDateTime,
 });
