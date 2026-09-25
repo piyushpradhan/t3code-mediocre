@@ -88,6 +88,24 @@ import {
 } from "./review.ts";
 import { KeybindingsConfigError } from "./keybindings.ts";
 import {
+  Px0DiffInput,
+  Px0DiffResult,
+  Px0Error,
+  Px0FileInput,
+  Px0FileResult,
+  Px0FindInput,
+  Px0FindResults,
+  Px0GutterResult,
+  Px0MetaInput,
+  Px0MetaResult,
+  Px0OutlineInput,
+  Px0OutlineResult,
+  Px0SearchInput,
+  Px0SearchResult,
+  Px0TreeInput,
+  Px0TreeResult,
+} from "./px0.ts";
+import {
   ClientOrchestrationCommand,
   ORCHESTRATION_WS_METHODS,
   OrchestrationDispatchCommandError,
@@ -337,6 +355,16 @@ export const WS_METHODS = {
   terminalClear: "terminal.clear",
   terminalRestart: "terminal.restart",
   terminalClose: "terminal.close",
+
+  // px0 code-viewer methods (read-only)
+  px0Meta: "px0.meta",
+  px0Tree: "px0.tree",
+  px0Find: "px0.find",
+  px0File: "px0.file",
+  px0Search: "px0.search",
+  px0Outline: "px0.outline",
+  px0Diff: "px0.diff",
+  px0Gutter: "px0.gutter",
 
   // Preview methods
   previewOpen: "preview.open",
@@ -1147,6 +1175,54 @@ const WsTerminalCloseRpc = Rpc.make(WS_METHODS.terminalClose, {
   error: Schema.Union([TerminalError, EnvironmentAuthorizationError]),
 });
 
+const WsPx0MetaRpc = Rpc.make(WS_METHODS.px0Meta, {
+  payload: Px0MetaInput,
+  success: Px0MetaResult,
+  error: Schema.Union([Px0Error, EnvironmentAuthorizationError]),
+});
+
+const WsPx0TreeRpc = Rpc.make(WS_METHODS.px0Tree, {
+  payload: Px0TreeInput,
+  success: Px0TreeResult,
+  error: Schema.Union([Px0Error, EnvironmentAuthorizationError]),
+});
+
+const WsPx0FindRpc = Rpc.make(WS_METHODS.px0Find, {
+  payload: Px0FindInput,
+  success: Px0FindResults,
+  error: Schema.Union([Px0Error, EnvironmentAuthorizationError]),
+});
+
+const WsPx0FileRpc = Rpc.make(WS_METHODS.px0File, {
+  payload: Px0FileInput,
+  success: Px0FileResult,
+  error: Schema.Union([Px0Error, EnvironmentAuthorizationError]),
+});
+
+const WsPx0SearchRpc = Rpc.make(WS_METHODS.px0Search, {
+  payload: Px0SearchInput,
+  success: Px0SearchResult,
+  error: Schema.Union([Px0Error, EnvironmentAuthorizationError]),
+});
+
+const WsPx0OutlineRpc = Rpc.make(WS_METHODS.px0Outline, {
+  payload: Px0OutlineInput,
+  success: Px0OutlineResult,
+  error: Schema.Union([Px0Error, EnvironmentAuthorizationError]),
+});
+
+const WsPx0DiffRpc = Rpc.make(WS_METHODS.px0Diff, {
+  payload: Px0DiffInput,
+  success: Px0DiffResult,
+  error: Schema.Union([Px0Error, EnvironmentAuthorizationError]),
+});
+
+const WsPx0GutterRpc = Rpc.make(WS_METHODS.px0Gutter, {
+  payload: Px0DiffInput,
+  success: Px0GutterResult,
+  error: Schema.Union([Px0Error, EnvironmentAuthorizationError]),
+});
+
 const WsPreviewOpenRpc = Rpc.make(WS_METHODS.previewOpen, {
   payload: PreviewOpenInput,
   success: PreviewSessionSnapshot,
@@ -1514,6 +1590,14 @@ export const WsRpcGroup = RpcGroup.make(
   WsPreviewAutomationFocusHostRpc,
   WsSubscribePreviewEventsRpc,
   WsSubscribeDiscoveredLocalServersRpc,
+  WsPx0MetaRpc,
+  WsPx0TreeRpc,
+  WsPx0FindRpc,
+  WsPx0FileRpc,
+  WsPx0SearchRpc,
+  WsPx0OutlineRpc,
+  WsPx0DiffRpc,
+  WsPx0GutterRpc,
   WsDeviceConfigureRpc,
   WsDeviceListRpc,
   WsDeviceTestHostRpc,

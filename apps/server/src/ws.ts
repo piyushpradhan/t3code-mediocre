@@ -132,6 +132,7 @@ import { deletePendingAttachment, issueAttachmentUploadUrl } from "./assets/Atta
 import * as PortScanner from "./preview/PortScanner.ts";
 import * as WorkspaceEntries from "./workspace/WorkspaceEntries.ts";
 import * as WorkspaceFileSystem from "./workspace/WorkspaceFileSystem.ts";
+import * as Px0Engine from "./px0/Engine.ts";
 import { readWorkflowScript } from "./orchestration/workflowScriptQuery.ts";
 import * as WorkspacePaths from "./workspace/WorkspacePaths.ts";
 import * as VcsStatusBroadcaster from "./vcs/VcsStatusBroadcaster.ts";
@@ -578,6 +579,7 @@ const makeWsRpcLayer = (
       const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
       const workspaceEntries = yield* WorkspaceEntries.WorkspaceEntries;
       const workspaceFileSystem = yield* WorkspaceFileSystem.WorkspaceFileSystem;
+      const px0Engine = yield* Px0Engine.Px0Engine;
       const canReplayPersistedRange = Effect.fnUntraced(function* (
         afterSequence: number,
         headSequence: number,
@@ -3144,6 +3146,38 @@ const makeWsRpcLayer = (
             ),
             { "rpc.aggregate": "workspace" },
           ),
+        [WS_METHODS.px0Meta]: (input) =>
+          observeRpcEffect(WS_METHODS.px0Meta, px0Engine.meta(input), {
+            "rpc.aggregate": "workspace",
+          }),
+        [WS_METHODS.px0Tree]: (input) =>
+          observeRpcEffect(WS_METHODS.px0Tree, px0Engine.tree(input), {
+            "rpc.aggregate": "workspace",
+          }),
+        [WS_METHODS.px0Find]: (input) =>
+          observeRpcEffect(WS_METHODS.px0Find, px0Engine.find(input), {
+            "rpc.aggregate": "workspace",
+          }),
+        [WS_METHODS.px0File]: (input) =>
+          observeRpcEffect(WS_METHODS.px0File, px0Engine.file(input), {
+            "rpc.aggregate": "workspace",
+          }),
+        [WS_METHODS.px0Search]: (input) =>
+          observeRpcEffect(WS_METHODS.px0Search, px0Engine.search(input), {
+            "rpc.aggregate": "workspace",
+          }),
+        [WS_METHODS.px0Outline]: (input) =>
+          observeRpcEffect(WS_METHODS.px0Outline, px0Engine.outline(input), {
+            "rpc.aggregate": "workspace",
+          }),
+        [WS_METHODS.px0Diff]: (input) =>
+          observeRpcEffect(WS_METHODS.px0Diff, px0Engine.diff(input), {
+            "rpc.aggregate": "workspace",
+          }),
+        [WS_METHODS.px0Gutter]: (input) =>
+          observeRpcEffect(WS_METHODS.px0Gutter, px0Engine.gutter(input), {
+            "rpc.aggregate": "workspace",
+          }),
         [WS_METHODS.attachmentsCreateUploadUrl]: (input) =>
           observeRpcEffect(WS_METHODS.attachmentsCreateUploadUrl, issueAttachmentUploadUrl(input), {
             "rpc.aggregate": "workspace",

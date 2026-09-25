@@ -156,6 +156,7 @@ import * as ProjectCloneTracker from "./project/ProjectCloneTracker.ts";
 import * as WorktreeSetupTracker from "./project/WorktreeSetupTracker.ts";
 import * as PreviewManager from "./preview/Manager.ts";
 import * as PortScanner from "./preview/PortScanner.ts";
+import * as Px0Engine from "./px0/Engine.ts";
 import * as BrowserTraceCollector from "./observability/BrowserTraceCollector.ts";
 import * as NativeAppIconResolver from "./assets/NativeAppIconResolver.ts";
 import * as ProjectFaviconResolver from "./project/ProjectFaviconResolver.ts";
@@ -982,6 +983,16 @@ const buildAppUnderTest = (options?: {
             retain: Effect.void,
             registerTerminalProcesses: () => Effect.void,
             unregisterTerminal: () => Effect.void,
+          }),
+          Layer.mock(Px0Engine.Px0Engine)({
+            meta: () => Effect.die("Px0Engine not stubbed in this test"),
+            tree: () => Effect.die("Px0Engine not stubbed in this test"),
+            find: () => Effect.die("Px0Engine not stubbed in this test"),
+            file: () => Effect.die("Px0Engine not stubbed in this test"),
+            search: () => Effect.die("Px0Engine not stubbed in this test"),
+            outline: () => Effect.die("Px0Engine not stubbed in this test"),
+            diff: () => Effect.die("Px0Engine not stubbed in this test"),
+            gutter: () => Effect.die("Px0Engine not stubbed in this test"),
           }),
         ),
       ),
