@@ -2409,3 +2409,149 @@ code {
 .floating-note-preview img {
   max-width: 100%;
 }
+
+/* px0 read-only file view. Rows are a fixed height so Px0FileSurface can
+   virtualize by arithmetic; token classes are px0's compact Chroma names. */
+.px0-view {
+  --px0-k: #cf222e;
+  --px0-kt: #0550ae;
+  --px0-nf: #8250df;
+  --px0-nc: #953800;
+  --px0-nb: #0550ae;
+  --px0-nv: #953800;
+  --px0-no: #0550ae;
+  --px0-na: #0550ae;
+  --px0-nt: #116329;
+  --px0-nd: #8250df;
+  --px0-np: #0550ae;
+  --px0-s: #0a3069;
+  --px0-m: #0550ae;
+  --px0-o: #cf222e;
+  --px0-p: #57606a;
+  --px0-c: #6e7781;
+  --px0-cp: #cf222e;
+  --px0-err: #cf222e;
+  --px0-gi: #116329;
+  --px0-gd: #82071e;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: var(--px0-line);
+  contain: strict;
+}
+.dark .px0-view {
+  --px0-k: #ff7b72;
+  --px0-kt: #ff7b72;
+  --px0-nf: #d2a8ff;
+  --px0-nc: #ffa657;
+  --px0-nb: #79c0ff;
+  --px0-nv: #ffa657;
+  --px0-no: #79c0ff;
+  --px0-na: #79c0ff;
+  --px0-nt: #7ee787;
+  --px0-nd: #d2a8ff;
+  --px0-np: #79c0ff;
+  --px0-s: #a5d6ff;
+  --px0-m: #79c0ff;
+  --px0-o: #ff7b72;
+  --px0-p: #c9d1d9;
+  --px0-c: #8b949e;
+  --px0-cp: #ff7b72;
+  --px0-err: #f85149;
+  --px0-gi: #3fb950;
+  --px0-gd: #f85149;
+}
+.px0-chunk {
+  position: absolute;
+  inset-inline: 0;
+  contain: layout style;
+}
+.px0-row {
+  display: flex;
+  height: var(--px0-line);
+}
+.px0-ln {
+  flex: none;
+  width: var(--px0-gutter);
+  padding-inline-end: 1ch;
+  text-align: right;
+  color: var(--color-muted-foreground);
+  opacity: 0.6;
+  user-select: none;
+}
+.px0-code {
+  flex: 1;
+  white-space: pre;
+  tab-size: 4;
+}
+.px0-code i {
+  font-style: normal;
+}
+.px0-reveal {
+  position: absolute;
+  inset-inline: 0;
+  height: var(--px0-line);
+  background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+  pointer-events: none;
+}
+.px0-code .k {
+  color: var(--px0-k);
+}
+.px0-code .kt {
+  color: var(--px0-kt);
+}
+.px0-code .nf {
+  color: var(--px0-nf);
+}
+.px0-code .nc {
+  color: var(--px0-nc);
+}
+.px0-code .nb {
+  color: var(--px0-nb);
+}
+.px0-code .nv {
+  color: var(--px0-nv);
+}
+.px0-code .no {
+  color: var(--px0-no);
+}
+.px0-code .na {
+  color: var(--px0-na);
+}
+.px0-code .nt {
+  color: var(--px0-nt);
+}
+.px0-code .nd {
+  color: var(--px0-nd);
+}
+.px0-code .np {
+  color: var(--px0-np);
+}
+.px0-code .s {
+  color: var(--px0-s);
+}
+.px0-code .m {
+  color: var(--px0-m);
+}
+.px0-code .o {
+  color: var(--px0-o);
+}
+.px0-code .p {
+  color: var(--px0-p);
+}
+.px0-code .cp {
+  color: var(--px0-cp);
+}
+.px0-code .c {
+  color: var(--px0-c);
+  font-style: italic;
+}
+.px0-code .gi {
+  color: var(--px0-gi);
+}
+.px0-code .gd {
+  color: var(--px0-gd);
+}
+.px0-code .err {
+  color: var(--px0-err);
+  text-decoration: underline wavy;
+}

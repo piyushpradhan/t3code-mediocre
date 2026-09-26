@@ -23,3 +23,13 @@ export const environmentProjects = createEnvironmentProjectAtoms({
   catalogValueAtom: environmentCatalog.catalogValueAtom,
   snapshotAtom: environmentSnapshotAtom,
 });
+/**
+ * Web-only: windows of px0-highlighted lines for the read-only Files surface.
+ * Keyed by line window, so scrolling a large file fetches only what is shown.
+ */
+export const px0File = createEnvironmentRpcQueryAtomFamily(connectionAtomRuntime, {
+  label: "environment-data:px0:file",
+  tag: WS_METHODS.px0File,
+  staleTimeMs: 30_000,
+  idleTtlMs: 60_000,
+});
