@@ -137,8 +137,9 @@ jobs:
           body: |
             Fork build based on upstream `${{ needs.resolve.outputs.base_upstream_tag }}`.
 
-            Unsigned macOS arm64 build. Install it once by hand, after which the
-            app auto-updates from this fork's releases.
+            Ad-hoc signed macOS arm64 build (not notarized). After dragging the app
+            to Applications, clear quarantine once:
+            `xattr -cr "/Applications/T3 Code (Alpha).app"`
           prerelease: false
           make_latest: true
           fail_on_unmatched_files: true
