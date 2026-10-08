@@ -107,6 +107,7 @@ import {
   setMarkdownTaskChecked,
   shouldShowFileExplorer,
 } from "./filePreviewMode";
+import { Px0FileSurface } from "./Px0FileSurface";
 import { useFileSaveCoordinator } from "./useFileSaveCoordinator";
 import {
   getOptimisticProjectFileQueryData,
@@ -1118,7 +1119,17 @@ export default function FilePreviewPanel({
   const updateClientSettings = useUpdateClientSettings();
   // Word wrap only reaches the text bodies. A rendered Markdown document, a table and the
   // browser frame all lay themselves out, so the toggle stays hidden rather than inert.
+  // Workspace text files render through px0: read-only, windowed, highlighted
+  // server-side. Rendered documents and host files keep their own surfaces.
+  const usesPx0 =
+    previewPath !== null &&
+    !isHostFile &&
+    !isMedia &&
+    !renderBrowserFile &&
+    !(isMarkdown && renderMarkdown) &&
+    !(tableDelimiter && renderTable);
   const showsRawText =
+    !usesPx0 &&
     previewPath !== null &&
     file.data !== null &&
     !(isMarkdown && renderMarkdown) &&
@@ -1223,6 +1234,84 @@ export default function FilePreviewPanel({
     );
   }
 
+  // The editor surfaces stay as px0's fallback: host files, rendered documents,
+  // and any path px0 cannot read (binary missing, unreadable file).
+  const renderLegacyTextSurface = () =>
+    relativePath && file.error && file.data === null ? (
+      <div role="alert" className="flex min-h-0 flex-1 flex-col overflow-auto">
+        <div className="my-auto flex shrink-0 flex-col gap-3 px-6 py-6 text-center text-xs leading-relaxed">
+          <p className="text-destructive">
+            {file.readError ? filePreviewReadErrorMessage(file.readError) : file.error}
+          </p>
+          {attemptedPath ? (
+            <p className="text-muted-foreground">
+              Attempted path
+              <code className="block break-all font-mono text-foreground select-all">
+                {attemptedPath}
+              </code>
+            </p>
+          ) : null}
+          {!isHostFile ? (
+            <p className="text-muted-foreground">
+              Workspace folder:{" "}
+              <code className="break-all font-mono select-all">{file.readError?.cwd ?? cwd}</code>.
+              Check the link's path or locate the file in Files.
+            </p>
+          ) : null}
+        </div>
+      </div>
+    ) : relativePath && file.data === null ? (
+      <div className="flex min-h-0 flex-1 items-center justify-center text-muted-foreground">
+        <Spinner size="lg" />
+      </div>
+    ) : relativePath && file.data ? (
+      isMarkdown && renderMarkdown ? (
+        // Markdown reconciles in place across text updates, so a file
+        // switch needs a new key or the previous file's disclosure and
+        // wrap state carries into the next document.
+        <RenderedMarkdownSurface
+          key={relativePath}
+          environmentId={environmentId}
+          cwd={cwd}
+          relativePath={relativePath}
+          threadRef={threadRef}
+          contents={file.data.contents}
+          readOnly={isHostFile || !canWriteFiles}
+          onPendingChange={onPendingChange}
+        />
+      ) : tableDelimiter && renderTable ? (
+        <DelimitedTablePreview
+          key={relativePath}
+          name={relativePath}
+          text={file.data.contents}
+          delimiter={tableDelimiter}
+        />
+      ) : file.data.truncated || isHostFile || !canWriteFiles ? (
+        <SourceFilePreview
+          name={relativePath}
+          text={file.data.contents}
+          cacheKey={projectFileCacheKey(cwd, relativePath, file.data.contents)}
+          onPostRender={onFilePostRender}
+        />
+      ) : (
+        <DiffWorkerPoolProvider>
+          <EditableFileSurface
+            key={`${relativePath}:${resolvedTheme}`}
+            environmentId={environmentId}
+            cwd={cwd}
+            relativePath={relativePath}
+            composerDraftTarget={composerDraftTarget}
+            contents={file.data.contents}
+            resolvedTheme={resolvedTheme}
+            revealRequestId={revealRequestId}
+            wordWrap={wordWrap}
+            onPostRender={onFilePostRender}
+            onPendingChange={onPendingChange}
+          />
+        </DiffWorkerPoolProvider>
+      )
+    ) : null;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
       {relativePath && attachment === undefined ? (
@@ -1310,6 +1399,7 @@ export default function FilePreviewPanel({
       attachment === undefined &&
       !isMedia &&
       !renderBrowserFile &&
+      !usesPx0 &&
       file.data?.truncated ? (
         <div className="shrink-0 border-b border-warning/20 bg-warning-surface px-3 py-1.5 text-2xs text-warning-foreground">
           Preview limited to the first 1 MB of a {file.data.byteLength.toLocaleString()} byte file.
@@ -1367,82 +1457,20 @@ export default function FilePreviewPanel({
               title={relativePath}
               workspaceMutationId={workspaceMutationId}
             />
-          ) : relativePath && file.error && file.data === null ? (
-            <div role="alert" className="flex min-h-0 flex-1 flex-col overflow-auto">
-              <div className="my-auto flex shrink-0 flex-col gap-3 px-6 py-6 text-center text-xs leading-relaxed">
-                <p className="text-destructive">
-                  {file.readError ? filePreviewReadErrorMessage(file.readError) : file.error}
-                </p>
-                {attemptedPath ? (
-                  <p className="text-muted-foreground">
-                    Attempted path
-                    <code className="block break-all font-mono text-foreground select-all">
-                      {attemptedPath}
-                    </code>
-                  </p>
-                ) : null}
-                {!isHostFile ? (
-                  <p className="text-muted-foreground">
-                    Workspace folder:{" "}
-                    <code className="break-all font-mono select-all">
-                      {file.readError?.cwd ?? cwd}
-                    </code>
-                    . Check the link's path or locate the file in Files.
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          ) : relativePath && file.data === null ? (
-            <div className="flex min-h-0 flex-1 items-center justify-center text-muted-foreground">
-              <Spinner size="lg" />
-            </div>
-          ) : relativePath && file.data ? (
-            isMarkdown && renderMarkdown ? (
-              // Markdown reconciles in place across text updates, so a file
-              // switch needs a new key or the previous file's disclosure and
-              // wrap state carries into the next document.
-              <RenderedMarkdownSurface
-                key={relativePath}
-                environmentId={environmentId}
-                cwd={cwd}
-                relativePath={relativePath}
-                threadRef={threadRef}
-                contents={file.data.contents}
-                readOnly={isHostFile || !canWriteFiles}
-                onPendingChange={onPendingChange}
-              />
-            ) : tableDelimiter && renderTable ? (
-              <DelimitedTablePreview
-                key={relativePath}
-                name={relativePath}
-                text={file.data.contents}
-                delimiter={tableDelimiter}
-              />
-            ) : file.data.truncated || isHostFile || !canWriteFiles ? (
-              <SourceFilePreview
-                name={relativePath}
-                text={file.data.contents}
-                cacheKey={projectFileCacheKey(cwd, relativePath, file.data.contents)}
-                onPostRender={onFilePostRender}
-              />
-            ) : (
-              <DiffWorkerPoolProvider>
-                <EditableFileSurface
-                  key={`${relativePath}:${resolvedTheme}`}
-                  environmentId={environmentId}
-                  cwd={cwd}
-                  relativePath={relativePath}
-                  composerDraftTarget={composerDraftTarget}
-                  contents={file.data.contents}
-                  resolvedTheme={resolvedTheme}
-                  revealRequestId={revealRequestId}
-                  wordWrap={wordWrap}
-                  onPostRender={onFilePostRender}
-                  onPendingChange={onPendingChange}
-                />
-              </DiffWorkerPoolProvider>
-            )
-          ) : null}
+          ) : relativePath && usesPx0 ? (
+            <Px0FileSurface
+              key={`${environmentId}:${cwd}:${relativePath}`}
+              environmentId={environmentId}
+              cwd={cwd}
+              relativePath={relativePath}
+              revealLine={revealLine}
+              revealRequestId={revealRequestId}
+              workspaceMutationId={workspaceMutationId}
+              fallback={renderLegacyTextSurface}
+            />
+          ) : (
+            renderLegacyTextSurface()
+          )}
         </div>
         {showExplorer ? (
           <aside

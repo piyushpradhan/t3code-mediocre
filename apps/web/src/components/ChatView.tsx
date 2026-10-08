@@ -285,6 +285,7 @@ import { PullRequestDetailPanel } from "./pullRequest/PullRequestDetailPanel";
 import { PullRequestDetailGhost } from "./pullRequest/PullRequestGhosts";
 import { PullRequestsUnavailableState } from "./pullRequest/PullRequestsUnavailableState";
 import { RightPanelTabs } from "./RightPanelTabs";
+import { FloatingNote } from "./FloatingNote";
 import { LinkPullRequestDialogHost } from "./pullRequest/LinkPullRequestDialog";
 import { ThreadPullRequestsPanel } from "./pullRequest/ThreadPullRequestsPanel";
 import { useDeviceState } from "~/state/device";
@@ -11307,6 +11308,20 @@ export default function ChatView(props: ChatViewProps) {
             onDrop={workspaceFileDropHandlers.onDrop}
           >
             <ThreadFind onClose={focusComposer} />
+            {serverProjection !== null ? (
+              <FloatingNote
+                key={activeThreadKey ?? "none"}
+                threadKey={activeThreadKey}
+                note={serverProjection.thread.note ?? null}
+                onSave={(note) => {
+                  if (activeThreadRef === null) return;
+                  void updateThreadMetadata({
+                    environmentId: activeThreadRef.environmentId,
+                    input: { threadId: activeThreadRef.threadId, note },
+                  });
+                }}
+              />
+            ) : null}
             {isWorkspaceFileDragActive ? (
               <div
                 className="pointer-events-none absolute inset-2 z-40 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary/60 bg-primary/[0.035]"

@@ -190,6 +190,7 @@ import { deletePendingAttachment, issueAttachmentUploadUrl } from "./assets/Atta
 import * as PortScanner from "./preview/PortScanner.ts";
 import * as WorkspaceEntries from "./workspace/WorkspaceEntries.ts";
 import * as WorkspaceFileSystem from "./workspace/WorkspaceFileSystem.ts";
+import * as Px0Engine from "./px0/Engine.ts";
 import { readWorkflowScript } from "./orchestration-v2/workflowScriptQuery.ts";
 import * as WorkspacePaths from "./workspace/WorkspacePaths.ts";
 import * as VcsStatusBroadcaster from "./vcs/VcsStatusBroadcaster.ts";
@@ -1286,6 +1287,7 @@ const layerWsRpc = (
       const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
       const workspaceEntries = yield* WorkspaceEntries.WorkspaceEntries;
       const workspaceFileSystem = yield* WorkspaceFileSystem.WorkspaceFileSystem;
+      const px0Engine = yield* Px0Engine.Px0Engine;
       const serverEnvironment = yield* ServerEnvironment.ServerEnvironment;
       const backgroundPolicy = yield* BackgroundPolicy.BackgroundPolicy;
       const rpcClientIds = yield* Ref.make(new Set<RpcClientId>());
@@ -2691,6 +2693,14 @@ const layerWsRpc = (
                 }),
             ),
           ),
+        [WS_METHODS.px0Meta]: (input) => px0Engine.meta(input),
+        [WS_METHODS.px0Tree]: (input) => px0Engine.tree(input),
+        [WS_METHODS.px0Find]: (input) => px0Engine.find(input),
+        [WS_METHODS.px0File]: (input) => px0Engine.file(input),
+        [WS_METHODS.px0Search]: (input) => px0Engine.search(input),
+        [WS_METHODS.px0Outline]: (input) => px0Engine.outline(input),
+        [WS_METHODS.px0Diff]: (input) => px0Engine.diff(input),
+        [WS_METHODS.px0Gutter]: (input) => px0Engine.gutter(input),
         [WS_METHODS.attachmentsCreateUploadUrl]: (input) => issueAttachmentUploadUrl(input),
         [WS_METHODS.attachmentsDelete]: (input) => deletePendingAttachment(input.attachmentId),
         [WS_METHODS.agentSessionsScan]: () => agentSessionScanner.scan,

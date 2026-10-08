@@ -1,0 +1,146 @@
+name: Release fork build
+
+# Fork-only. Publishes this fork's own desktop build to this fork's GitHub
+# Releases so the T3 Code (Alpha) app auto-updates from the fork instead of
+# upstream. macOS arm64 only, unsigned (no Apple certs on this fork).
+#
+# Triggered two ways:
+#   1. `workflow_dispatch` — cut a release whenever you merge code.
+#   2. `schedule` — watches upstream's stable releases and cuts a fork build
+#      when a newer upstream stable than the last fork release appears.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Fork release version (e.g. 0.0.44). Defaults to bumping the current fork patch version."
+        required: false
+        type: string
+  schedule:
+    - cron: "41 */6 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-fork
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: Resolve fork release
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      tag: ${{ steps.resolve.outputs.tag }}
+      base_upstream_tag: ${{ steps.resolve.outputs.base_upstream_tag }}
+      should_release: ${{ steps.resolve.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - id: resolve
+        name: Resolve version and whether a release is due
+        shell: bash
+        env:
+          MANUAL_VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # Latest upstream stable. Upstream marks stable `make_latest=true` and
+          # nightly/preview `make_latest=false`, so `releases/latest` is stable.
+          upstream_stable="$(gh api repos/pingdotgg/t3code/releases/latest --jq '.tag_name // empty' 2>/dev/null || true)"
+          # The upstream base tag the last fork release was built on, recorded
+          # in its body. Empty when no fork release exists yet.
+          last_base="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.body // empty' 2>/dev/null \
+            | sed -n 's/.*based on upstream `\([^`]*\)`.*/\1/p' | head -n1 || true)"
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            should_release="true"
+          elif [[ -z "$last_base" ]]; then
+            # No fork release yet: always build on schedule.
+            should_release="true"
+          elif [[ -n "$upstream_stable" ]] && [[ "$upstream_stable" != "$last_base" ]]; then
+            should_release="true"
+          else
+            should_release="false"
+          fi
+
+          # Resolve the fork version. Manual overrides win. Otherwise derive the
+          # next patch from the fork's own latest release tag, so repeated
+          # releases never collide (the build's version write is not committed).
+          fork_latest="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --json tagName --jq '.[0].tagName // empty' 2>/dev/null || true)"
+          if [[ -n "${MANUAL_VERSION:-}" ]]; then
+            version="${MANUAL_VERSION#v}"
+          elif [[ -n "$fork_latest" ]]; then
+            version="$(node -e "const [maj,min,pat]=process.argv[1].replace(/^v/,'').split('.'); console.log(maj+'.'+min+'.'+(Number(pat)+1))" "$fork_latest")"
+          else
+            version="$(node -e "const [maj,min,pat]=process.argv[1].split('.'); console.log(maj+'.'+min+'.'+(Number(pat)+1))" "$(node -p "require('./apps/server/package.json').version")")"
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "base_upstream_tag=${upstream_stable:-unknown}" >> "$GITHUB_OUTPUT"
+          echo "should_release=$should_release" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build and publish macOS arm64
+    needs: [resolve]
+    if: needs.resolve.outputs.should_release == 'true'
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: true
+
+      - name: Ensure Electron runtime is installed
+        run: vp run --filter @t3tools/desktop ensure:electron
+
+      - name: Align package versions to fork release version
+        run: node scripts/update-release-package-versions.ts "${{ needs.resolve.outputs.version }}"
+
+      - name: Build unsigned macOS arm64 DMG
+        run: vp run dist:desktop:dmg:arm64
+
+      - id: release_files
+        name: Resolve release asset list
+        shell: bash
+        run: |
+          shopt -s nullglob
+          # The DMG, its blockmap, and the latest-mac.yml manifest electron-builder
+          # emitted (GITHUB_REPOSITORY is this fork, so the feed points here).
+          {
+            echo 'files<<EOF'
+            echo 'release/*.dmg'
+            echo 'release/*.zip'
+            echo 'release/*.blockmap'
+            echo 'release/latest-mac.yml'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish fork release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.resolve.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: T3 Code v${{ needs.resolve.outputs.version }}
+          body: |
+            Fork build based on upstream `${{ needs.resolve.outputs.base_upstream_tag }}`.
+
+            Unsigned macOS arm64 build. Install it once by hand, after which the
+            app auto-updates from this fork's releases.
+          prerelease: false
+          make_latest: true
+          fail_on_unmatched_files: true
+          files: ${{ steps.release_files.outputs.files }}
+          token: ${{ github.token }}

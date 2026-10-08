@@ -61,6 +61,8 @@ interface LegacyThreadRow {
   readonly branch_pull_request_json: string | null;
   readonly active_order_key: string | null;
   readonly deleted_at: string | null;
+  /** Fork: only selected by the first-import query. */
+  readonly note?: string | null;
 }
 
 interface LegacyRepairRow extends LegacyThreadRow {
@@ -217,6 +219,7 @@ function importedThread(row: LegacyThreadRow): OrchestrationV2AppThread {
     linkedPullRequest,
     pullRequests: importedPullRequests,
     branchPullRequest: branchPullRequestFor(row),
+    ...(row.note?.trim() ? { note: row.note.trim() } : {}),
     activeOrderKey: row.active_order_key?.trim() || null,
     activeProviderThreadId: null,
     historyOrigin: "v1_import",
@@ -571,7 +574,8 @@ const make = Effect.gen(function* () {
         thread.linked_pull_request_json,
         thread.branch_pull_request_json,
         thread.active_order_key,
-        thread.deleted_at
+        thread.deleted_at,
+        thread.note
       FROM projection_threads AS thread
       WHERE NOT EXISTS (
         SELECT 1
