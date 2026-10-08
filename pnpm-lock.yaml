@@ -813,6 +813,9 @@ importers:
       react-markdown:
         specifier: ^10.1.0
         version: 10.1.0(@types/react@19.3.0)(react@19.2.6)
+      remark-breaks:
+        specifier: 'catalog:'
+        version: 4.0.0
       remark-gfm:
         specifier: 'catalog:'
         version: 4.0.1
