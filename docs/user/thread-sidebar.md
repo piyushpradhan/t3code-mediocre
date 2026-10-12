@@ -43,6 +43,16 @@ in a new thread's model picker to add or remove them. A regular click returns to
 single model. Choose a base branch and send. Each selection starts a separate thread
 and worktree while you stay in the new thread composer. This requires a Git project.
 
+## Switch threads with the sidebar hidden
+
+On web and desktop, enable **Floating sidebar** in **Settings → General** to
+temporarily show the hidden sidebar by hovering near the left edge or sidebar
+toggle. Select a thread or move away to dismiss it. Clicking the toggle opens
+the regular docked sidebar until you click it again.
+
+The preview uses the **Panel animations** duration in **Settings → Appearance**
+and respects your system's reduced motion preference.
+
 ## Pin and reorder threads
 
 Pin a thread from its menu to keep it above your active work.

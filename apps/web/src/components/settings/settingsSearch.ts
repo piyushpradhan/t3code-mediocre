@@ -332,6 +332,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/appearance",
   },
   {
+    id: "floating-sidebar",
+    title: "Floating sidebar",
+    to: "/settings/general",
+    searchTerms: ["hover edge temporary overlay sidebar threads pin toggle"],
+  },
+  {
     id: "project-grouping",
     title: "Project grouping",
     to: "/settings/general",

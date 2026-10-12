@@ -98,6 +98,7 @@ function SidebarProvider({
   defaultOpen = true,
   open: openProp,
   onOpenChange: setOpenProp,
+  onToggleSidebar,
   className,
   style,
   children,
@@ -106,6 +107,7 @@ function SidebarProvider({
   defaultOpen?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  onToggleSidebar?: () => void;
 }) {
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
@@ -140,8 +142,10 @@ function SidebarProvider({
 
   // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
-  }, [isMobile, setOpen]);
+    if (isMobile) return setOpenMobile((open) => !open);
+    if (onToggleSidebar) return onToggleSidebar();
+    return setOpen((open) => !open);
+  }, [isMobile, onToggleSidebar, setOpen]);
 
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.
@@ -331,7 +335,7 @@ function Sidebar({
           {...props}
         >
           <div
-            className="flex h-full w-full flex-col bg-sidebar surface-grain group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm/5"
+            className="flex h-full min-h-0 w-full flex-col bg-sidebar surface-grain group-data-[variant=floating]:overflow-hidden group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm/5"
             data-sidebar="sidebar"
             data-slot="sidebar-inner"
           >
@@ -345,7 +349,9 @@ function Sidebar({
 
 function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<typeof Button>) {
   const { toggleSidebar } = useSidebar();
-  const isOpen = useSidebarVisibility();
+  const isVisible = useSidebarVisibility();
+  // A floating preview can be visible while the toggle's pinned state is off.
+  const isOpen = typeof props["aria-pressed"] === "boolean" ? props["aria-pressed"] : isVisible;
 
   return (
     <Button

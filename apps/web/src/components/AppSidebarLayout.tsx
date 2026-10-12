@@ -4,12 +4,16 @@ import {
   useEffect,
   useState,
   useSyncExternalStore,
+  type ComponentProps,
   type CSSProperties,
+  type PointerEvent,
   type ReactNode,
 } from "react";
 import { useLocation, useNavigate, useParams } from "@tanstack/react-router";
 
 import { isElectron } from "../env";
+import { useIsMobile, useMediaQuery } from "../hooks/useMediaQuery";
+import { useFloatingSidebar } from "../hooks/useFloatingSidebar";
 import { getLocalStorageItem, removeLocalStorageItem } from "../hooks/useLocalStorage";
 import {
   isRichTextBoldShortcut,
@@ -25,7 +29,11 @@ import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../termina
 import { resolveThreadRouteRef } from "../threadRoutes";
 import { cn, isMacPlatform } from "../lib/utils";
 import { primaryServerKeybindingsAtom } from "../state/server";
-import { useEnvironmentIdentificationMode, useLegacySidebarEnabled } from "../hooks/useSettings";
+import {
+  useClientSettings,
+  useEnvironmentIdentificationMode,
+  useLegacySidebarEnabled,
+} from "../hooks/useSettings";
 import {
   PanelAnimationSuppressionProvider,
   usePanelAnimationSettings,
@@ -80,7 +88,13 @@ function readInitialThreadSidebarWidth(): number {
   }
 }
 
-function SidebarControl() {
+function SidebarControl({
+  hoverProps,
+  floatingPinned,
+}: {
+  hoverProps?: Pick<ComponentProps<"div">, "onPointerEnter" | "onPointerLeave"> | undefined;
+  floatingPinned?: boolean | undefined;
+}) {
   const usagePageOpen = useLocation({ select: (location) => location.pathname === "/usage" });
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const { toggleSidebar, isMobile, mobileSheetMounted } = useSidebar();
@@ -89,6 +103,8 @@ function SidebarControl() {
   const stageBackdropVariant = useSidebarStageBackdropVariant(
     environmentIdentificationMode === "artwork",
   );
+  const toggleOnArtwork =
+    floatingPinned !== false && isSidebarVisible && stageBackdropVariant !== null;
   const shortcutLabel = shortcutLabelForCommand(keybindings, "sidebar.toggle", {
     context: { usagePageOpen },
   });
@@ -145,6 +161,7 @@ function SidebarControl() {
         isMobile && mobileSheetMounted && "hidden",
       )}
       data-sidebar-control=""
+      {...hoverProps}
     >
       <Tooltip>
         <TooltipTrigger
@@ -152,17 +169,23 @@ function SidebarControl() {
             <SidebarTrigger
               // Over the stage artwork the trigger is a control on imagery, like the media
               // viewer's arrows; that variant positions itself, so the layout is reset here.
-              variant={isSidebarVisible && stageBackdropVariant ? "media-navigation" : "ghost"}
+              variant={toggleOnArtwork ? "media-navigation" : "ghost"}
               className={cn(
                 "pointer-events-auto",
-                isSidebarVisible && stageBackdropVariant && "relative top-auto translate-y-0",
+                toggleOnArtwork && "relative top-auto translate-y-0",
               )}
               aria-label="Toggle main sidebar"
+              aria-pressed={floatingPinned ?? isSidebarVisible}
             />
           }
         />
         <TooltipPopup side="bottom">
-          Toggle main sidebar{shortcutLabel ? ` (${shortcutLabel})` : ""}
+          {floatingPinned === undefined
+            ? "Toggle main sidebar"
+            : floatingPinned
+              ? "Hide main sidebar"
+              : "Pin main sidebar open"}
+          {shortcutLabel ? ` (${shortcutLabel})` : ""}
         </TooltipPopup>
       </Tooltip>
     </div>
@@ -229,6 +252,7 @@ function ProjectProjectionRetention() {
 
 export function AppSidebarLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
+  const clientSettings = useClientSettings();
   const legacySidebarEnabled = useLegacySidebarEnabled();
   const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } =
     usePanelAnimationSettings();
@@ -240,6 +264,40 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   const panelAnimationsSuppressed = usePanelNavigationSuppression(pathname);
   const routePanelAnimationsActive = panelAnimationsActive && !panelAnimationsSuppressed;
   const isOnSettings = pathname === "/settings" || pathname.startsWith("/settings/");
+  const isMobile = useIsMobile();
+  const canHover = useMediaQuery("(any-hover: hover) and (any-pointer: fine)");
+  const floatingSidebarActive = clientSettings.floatingSidebarEnabled && !isOnSettings && !isMobile;
+  const locationHref = useLocation({ select: (location) => location.href });
+  const floatingSidebar = useFloatingSidebar(
+    clientSettings.floatingSidebarEnabled,
+    locationHref,
+    floatingSidebarActive && canHover,
+  );
+  const floatingSidebarOverlay = floatingSidebarActive && !floatingSidebar.pinned;
+  const floatingSidebarPresentation = floatingSidebarActive && floatingSidebar.floating;
+  const floatingHoverProps =
+    floatingSidebarOverlay && canHover
+      ? {
+          onPointerEnter: (event: PointerEvent<HTMLDivElement>) => {
+            if (event.pointerType === "mouse" && event.buttons === 0) {
+              floatingSidebar.enterBoundary();
+            }
+          },
+          onPointerLeave: (event: PointerEvent<HTMLDivElement>) => {
+            // The edge, toggle, padded panel and resize gutter form one hover boundary.
+            if (
+              event.relatedTarget instanceof Element &&
+              event.relatedTarget.closest(
+                "[data-app-sidebar], [data-sidebar-control], [data-floating-sidebar-hover-zone]",
+              )
+            ) {
+              floatingSidebar.retainPreview();
+            } else {
+              floatingSidebar.leaveBoundary();
+            }
+          },
+        }
+      : undefined;
   const isMacosDesktop = isElectron && isMacPlatform(navigator.platform);
   const [sidebarWidth, setSidebarWidth] = useState(readInitialThreadSidebarWidth);
   // Subscribed rather than read once: the clamp must track live window size,
@@ -248,7 +306,9 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   const viewportWidth = useSyncExternalStore(subscribeToViewportWidth, readViewportWidth);
   const [brandWidth, setBrandWidth] = useState(0);
   const sidebarMinimumWidth = resolveThreadSidebarMinimumWidth(brandWidth);
-  const sidebarMaximumWidth = resolveThreadSidebarMaximumWidth(viewportWidth, sidebarMinimumWidth);
+  const sidebarMaximumWidth = floatingSidebarOverlay
+    ? Math.max(sidebarMinimumWidth, Math.min(480, viewportWidth - 24))
+    : resolveThreadSidebarMaximumWidth(viewportWidth, sidebarMinimumWidth);
   const resetSidebarWidth = () => {
     try {
       removeLocalStorageItem(THREAD_SIDEBAR_WIDTH_STORAGE_KEY);
@@ -315,22 +375,53 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
     <PanelAnimationSuppressionProvider value={panelAnimationsSuppressed}>
       <SidebarProvider
         className="h-dvh! min-h-0!"
+        data-floating-sidebar={floatingSidebarPresentation ? "true" : undefined}
+        data-sidebar-hover-mode={floatingSidebarOverlay ? "true" : undefined}
         data-panel-animations={routePanelAnimationsActive ? "true" : "false"}
         defaultOpen
+        {...(floatingSidebarActive
+          ? {
+              open: floatingSidebar.open,
+              onOpenChange: floatingSidebar.setPinned,
+              onToggleSidebar: floatingSidebar.togglePinned,
+            }
+          : {})}
         style={sidebarProviderStyle}
       >
         <SidebarBrandWidthProbe onWidthChange={setBrandWidth} />
         <ProjectProjectionRetention />
         <Sidebar
+          variant={floatingSidebarPresentation ? "floating" : "sidebar"}
           side="left"
           collapsible="offcanvas"
           data-app-sidebar=""
+          onClickCapture={
+            floatingSidebarActive
+              ? (event) => {
+                  const target = event.target;
+                  if (
+                    target instanceof Element &&
+                    !event.metaKey &&
+                    !event.ctrlKey &&
+                    !event.shiftKey &&
+                    !event.altKey &&
+                    !target.closest("button, a, input, textarea, [contenteditable='true']") &&
+                    target.closest("[data-thread-item]")
+                  ) {
+                    floatingSidebar.dismissPreview();
+                  }
+                }
+              : undefined
+          }
+          onPointerEnter={floatingSidebarActive ? floatingSidebar.retainPreview : undefined}
+          onPointerLeave={floatingHoverProps?.onPointerLeave}
           role="navigation"
           aria-label={isOnSettings ? "Settings" : "Threads"}
           resizable={{
             maxWidth: sidebarMaximumWidth,
             minWidth: sidebarMinimumWidth,
             shouldAcceptWidth: ({ currentWidth, nextWidth, wrapper }) =>
+              floatingSidebarOverlay ||
               nextWidth <= currentWidth ||
               wrapper.clientWidth - nextWidth >= THREAD_MAIN_CONTENT_MIN_WIDTH,
             storageKey: THREAD_SIDEBAR_WIDTH_STORAGE_KEY,
@@ -351,8 +442,14 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
           )}
           <SidebarRail onDoubleClick={resetSidebarWidth} />
         </Sidebar>
+        {floatingSidebarOverlay && canHover ? (
+          <div aria-hidden="true" data-floating-sidebar-hover-zone="" {...floatingHoverProps} />
+        ) : null}
         {children}
-        <SidebarControl />
+        <SidebarControl
+          hoverProps={floatingHoverProps}
+          floatingPinned={floatingSidebarActive ? floatingSidebar.pinned : undefined}
+        />
         <NavigationHistoryShortcuts />
         <MainAppLocationTracker />
       </SidebarProvider>

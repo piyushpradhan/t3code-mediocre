@@ -1242,6 +1242,105 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   }
 }
 
+/* Hover previews overlay the chat; pinned sidebars keep the ordinary docked layout. */
+[data-floating-sidebar="true"] {
+  --floating-sidebar-duration: 0ms;
+}
+
+[data-floating-sidebar="true"][data-panel-animations="true"] {
+  --floating-sidebar-duration: var(--panel-animation-duration);
+}
+
+[data-floating-sidebar="true"] [data-slot="sidebar-gap"] {
+  width: 0 !important;
+}
+
+[data-floating-sidebar="true"] [data-slot="sidebar-container"] {
+  /* Leave the native titlebar and outer resize border available to Electron. */
+  top: calc(var(--workspace-controls-top) + var(--workspace-topbar-height));
+  bottom: 4px;
+  left: 4px;
+  height: auto;
+  width: min(var(--sidebar-width), calc(100vw - 24px));
+  padding: 0 12px 8px 8px;
+  z-index: 60;
+  opacity: 1;
+  translate: 0;
+  visibility: visible;
+  transition:
+    opacity var(--floating-sidebar-duration)
+      var(--motion-ease-drawer, cubic-bezier(0.32, 0.72, 0, 1)),
+    translate var(--floating-sidebar-duration)
+      var(--motion-ease-drawer, cubic-bezier(0.32, 0.72, 0, 1)),
+    visibility 0ms;
+}
+
+[data-floating-sidebar="true"]
+  [data-slot="sidebar"][data-state="collapsed"]
+  [data-slot="sidebar-container"] {
+  left: 4px;
+  opacity: 0;
+  translate: -12px 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--floating-sidebar-duration)
+      var(--motion-ease-drawer, cubic-bezier(0.32, 0.72, 0, 1)),
+    translate var(--floating-sidebar-duration)
+      var(--motion-ease-drawer, cubic-bezier(0.32, 0.72, 0, 1)),
+    visibility 0ms var(--floating-sidebar-duration);
+}
+
+[data-floating-sidebar="true"] [data-slot="sidebar-inner"] {
+  --workspace-titlebar-content-left: var(--sidebar-content-inset);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 18%);
+  -webkit-app-region: no-drag;
+}
+
+[data-floating-sidebar="true"] [data-slot="sidebar-inner"] .drag-region {
+  -webkit-app-region: no-drag;
+}
+
+/* Include the inset padding and resize gutter in the panel's hover boundary. */
+[data-floating-sidebar="true"] [data-slot="sidebar-container"]::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: -12px;
+  bottom: 0;
+  width: 24px;
+  -webkit-app-region: no-drag;
+}
+
+[data-sidebar-hover-mode="true"] [data-sidebar-control] {
+  z-index: 70;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+[data-floating-sidebar-hover-zone] {
+  position: fixed;
+  top: calc(var(--workspace-controls-top) + var(--workspace-topbar-height));
+  bottom: 8px;
+  left: 4px;
+  width: 20px;
+  z-index: 40;
+  -webkit-app-region: no-drag;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-floating-sidebar="true"] [data-slot="sidebar-container"] {
+    transition: none;
+  }
+
+  [data-floating-sidebar="true"]
+    [data-slot="sidebar"][data-state="collapsed"]
+    [data-slot="sidebar-container"] {
+    transition: none;
+  }
+}
+
 /* Theme files are expressed in app color roles and mapped to the existing
    semantic surface tokens here. Keep this block after the sidebar-version
    compatibility overrides so both navigation implementations receive the

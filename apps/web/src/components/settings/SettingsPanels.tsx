@@ -2269,6 +2269,19 @@ export function GeneralSettingsPanel() {
       <ProjectDefaultsSettings category="general" />
       <SettingsSection id="organization" title="Organization">
         <SettingsRow
+          {...searchableSetting("floating-sidebar")}
+          description="Hover the left edge or sidebar toggle to preview threads. Click the toggle to keep the regular sidebar open; click it again to hide it."
+          control={
+            <Switch
+              checked={settings.floatingSidebarEnabled}
+              onCheckedChange={(checked) =>
+                updateSettings({ floatingSidebarEnabled: Boolean(checked) })
+              }
+              aria-label="Floating sidebar"
+            />
+          }
+        />
+        <SettingsRow
           {...searchableSetting("project-grouping")}
           description="Combine matching repositories across environments."
           resetAction={

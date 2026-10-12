@@ -645,6 +645,13 @@ describe("ClientSettings sidebar", () => {
     );
   });
 
+  it("defaults floating sidebar off and persists the opt-in", () => {
+    expect(decodeClientSettings({}).floatingSidebarEnabled).toBe(false);
+    expect(decodeClientSettingsPatch({ floatingSidebarEnabled: true }).floatingSidebarEnabled).toBe(
+      true,
+    );
+  });
+
   it("keeps unpin confirmation opt-in and patchable", () => {
     expect(decodeClientSettings({}).confirmThreadUnpin).toBe(false);
     expect(decodeClientSettingsPatch({ confirmThreadUnpin: true }).confirmThreadUnpin).toBe(true);
