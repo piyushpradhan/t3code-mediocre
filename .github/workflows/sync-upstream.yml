@@ -90,7 +90,15 @@ jobs:
         with:
           node-version-file: package.json
           cache: true
-          run-install: true
+          run-install: false
+
+      - name: Reconcile lockfile and install dependencies
+        if: steps.merge.outputs.result == 'conflict'
+        run: |
+          # The upstream lockfile can omit dependencies kept in the fork's manifests.
+          vp install --lockfile-only --no-frozen-lockfile --ignore-scripts
+          vp install --frozen-lockfile
+          git add pnpm-lock.yaml
 
       # ponytail: typecheck only. CI on main runs the full suite after push.
       - id: typecheck
