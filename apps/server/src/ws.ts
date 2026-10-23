@@ -1,4 +1,5 @@
 import { OrchestrationDispatchCommandError } from "@t3tools/contracts";
+import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 
@@ -104,7 +105,7 @@ import {
   HttpServerRespondable,
   HttpServerResponse,
 } from "effect/http";
-import { RpcSerialization, RpcServer } from "effect/rpc";
+import { RpcGroup, RpcSerialization, RpcServer } from "effect/rpc";
 
 import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
 import * as ServerConfig from "./config.ts";
@@ -576,6 +577,24 @@ const layerPx0WsRpc = WsPx0RpcGroup.middleware(RpcInstrumentation).toLayer(
     };
   }),
 );
+
+// RpcGroup.toLayer derives each handler's requirements by scanning every RPC in
+// the group, so its type cost grows with handlers × RPCs. Near 200 methods that
+// crosses TypeScript's instantiation limit and the layer's requirements degrade to
+// `any`, so the handlers are registered as two disjoint, smaller groups.
+type ServerWsRpc = RpcGroup.Rpcs<typeof ServerCoreWsRpcGroup>;
+const SPLIT_WS_RPC_PREFIXES = ["server", "pullRequests", "provider", "orchestration"] as const;
+type SplitWsRpc = Extract<
+  ServerWsRpc,
+  { readonly _tag: `${(typeof SPLIT_WS_RPC_PREFIXES)[number]}.${string}` }
+>;
+const isSplitWsRpc = (rpc: ServerWsRpc): rpc is SplitWsRpc =>
+  SPLIT_WS_RPC_PREFIXES.some((prefix) => rpc._tag.startsWith(`${prefix}.`));
+const isOtherWsRpc = (rpc: ServerWsRpc): rpc is Exclude<ServerWsRpc, SplitWsRpc> =>
+  !isSplitWsRpc(rpc);
+const serverWsRpcs = Array.from(ServerCoreWsRpcGroup.requests.values());
+const SplitWsRpcGroup = RpcGroup.make(...serverWsRpcs.filter(isSplitWsRpc));
+const OtherWsRpcGroup = RpcGroup.make(...serverWsRpcs.filter(isOtherWsRpc));
 // Replaying each intervening event costs a shell refetch; past this gap a
 // single O(active-threads) snapshot is cheaper and bounded.
 const SHELL_RESUME_MAX_GAP = 1_000;
@@ -1182,12 +1201,7 @@ export const subscribeOrchestrationV2Shell = Effect.fn("ws.orchestrationV2.subsc
         });
       }
 
-      const currentShell = yield* threadManagement.getShellSnapshot({ location: "active" });
-      subagentThreadIds = new Set(
-        currentShell.threads
-          .filter((thread) => thread.lineage.relationshipToParent === "subagent")
-          .map((thread) => thread.id),
-      );
+      subagentThreadIds = new Set(yield* threadManagement.listActiveSubagentThreadIds());
 
       const loaded = yield* loadProjectMetadataSnapshot(highWater);
       const replay = toShellStream(
@@ -1237,7 +1251,7 @@ const layerCoreWsRpc = (
   previewAutomationBroker: PreviewAutomationBroker.PreviewAutomationBroker["Service"],
   serverBrowser: ServerBrowser.ServerBrowser["Service"],
 ) =>
-  ServerCoreWsRpcGroup.toLayer(
+  Layer.effectContext(
     Effect.gen(function* () {
       const currentSessionId = currentSession.sessionId;
       const sql = yield* SqlClient.SqlClient;
@@ -1753,13 +1767,29 @@ const layerCoreWsRpc = (
           observability: {
             logsDirectoryPath: config.logsDir,
             localTracingEnabled: true,
-            ...(config.otlpTracesUrl !== undefined ? { otlpTracesUrl: config.otlpTracesUrl } : {}),
+            ...(config.otlpTracesUrl !== undefined
+              ? {
+                  otlpTracesUrl: config.otlpTracesUrl,
+                  otlpTracesSource: config.otlpTracesSource,
+                  otlpTracesVariable: config.otlpTracesVariable,
+                }
+              : {}),
             otlpTracesEnabled: config.otlpTracesUrl !== undefined,
             ...(config.otlpMetricsUrl !== undefined
-              ? { otlpMetricsUrl: config.otlpMetricsUrl }
+              ? {
+                  otlpMetricsUrl: config.otlpMetricsUrl,
+                  otlpMetricsSource: config.otlpMetricsSource,
+                  otlpMetricsVariable: config.otlpMetricsVariable,
+                }
               : {}),
             otlpMetricsEnabled: config.otlpMetricsUrl !== undefined,
-            ...(config.otlpLogsUrl !== undefined ? { otlpLogsUrl: config.otlpLogsUrl } : {}),
+            ...(config.otlpLogsUrl !== undefined
+              ? {
+                  otlpLogsUrl: config.otlpLogsUrl,
+                  otlpLogsSource: config.otlpLogsSource,
+                  otlpLogsVariable: config.otlpLogsVariable,
+                }
+              : {}),
             otlpLogsEnabled: config.otlpLogsUrl !== undefined,
           },
           settings,
@@ -3173,7 +3203,13 @@ const layerCoreWsRpc = (
             ),
           ),
       });
-      return handlers;
+      const splitHandlers: Pick<typeof handlers, SplitWsRpc["_tag"]> = handlers;
+      const otherHandlers: Pick<typeof handlers, Exclude<ServerWsRpc, SplitWsRpc>["_tag"]> =
+        handlers;
+      return Context.merge(
+        yield* SplitWsRpcGroup.toHandlers(splitHandlers),
+        yield* OtherWsRpcGroup.toHandlers(otherHandlers),
+      );
     }),
   );
 
