@@ -89,7 +89,7 @@ jobs:
     name: Build and publish macOS arm64
     needs: [resolve]
     if: needs.resolve.outputs.should_release == 'true'
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
