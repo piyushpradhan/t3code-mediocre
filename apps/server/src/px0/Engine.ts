@@ -166,7 +166,7 @@ export const make = Effect.gen(function* Px0EngineMake() {
     });
 
   return Px0Engine.of({
-    meta: (input) =>
+    meta: Effect.fn("Px0Engine.meta")((input: Px0MetaInput) =>
       call("meta", input.cwd, (c) => c.meta()).pipe(
         Effect.map((m): Px0MetaResult => ({
           root: m.root,
@@ -180,7 +180,8 @@ export const make = Effect.gen(function* Px0EngineMake() {
           version: m.version,
         })),
       ),
-    tree: (input) =>
+    ),
+    tree: Effect.fn("Px0Engine.tree")((input: Px0TreeInput) =>
       call("tree", input.cwd, (c) => c.tree(input.dir)).pipe(
         Effect.map((children): Px0TreeResult => ({
           dir: input.dir,
@@ -192,11 +193,13 @@ export const make = Effect.gen(function* Px0EngineMake() {
           })),
         })),
       ),
-    find: (input) =>
+    ),
+    find: Effect.fn("Px0Engine.find")((input: Px0FindInput) =>
       call("find", input.cwd, (c) => c.find(input.q, omitUndefined({ limit: input.limit }))).pipe(
         Effect.map((results): Px0FindResults => ({ results })),
       ),
-    file: (input) =>
+    ),
+    file: Effect.fn("Px0Engine.file")((input: Px0FileInput) =>
       call("file", input.cwd, (c) =>
         c.file(input.path, omitUndefined({ start: input.start, count: input.count })),
       ).pipe(
@@ -232,8 +235,11 @@ export const make = Effect.gen(function* Px0EngineMake() {
               },
         ),
       ),
-    table: (input) => call("table", input.cwd, (c) => c.table(input.path)),
-    search: (input) =>
+    ),
+    table: Effect.fn("Px0Engine.table")((input: Px0TableInput) =>
+      call("table", input.cwd, (c) => c.table(input.path)),
+    ),
+    search: Effect.fn("Px0Engine.search")((input: Px0SearchInput) =>
       call("search", input.cwd, (c) =>
         c.search(
           input.q,
@@ -245,15 +251,20 @@ export const make = Effect.gen(function* Px0EngineMake() {
           }),
         ),
       ),
-    outline: (input) =>
+    ),
+    outline: Effect.fn("Px0Engine.outline")((input: Px0OutlineInput) =>
       call("outline", input.cwd, (c) => c.outline(input.path)).pipe(
         Effect.map((symbols): Px0OutlineResult => ({ path: input.path, symbols })),
       ),
-    diff: (input) =>
+    ),
+    diff: Effect.fn("Px0Engine.diff")((input: Px0DiffInput) =>
       call("diff", input.cwd, (c) => c.diff(input.path)).pipe(
         Effect.map((d): Px0DiffResult => ({ path: d.path, diff: d.diff, available: d.available })),
       ),
-    gutter: (input) => call("gutter", input.cwd, (c) => c.gutter(input.path)),
+    ),
+    gutter: Effect.fn("Px0Engine.gutter")((input: Px0DiffInput) =>
+      call("gutter", input.cwd, (c) => c.gutter(input.path)),
+    ),
   });
 });
 

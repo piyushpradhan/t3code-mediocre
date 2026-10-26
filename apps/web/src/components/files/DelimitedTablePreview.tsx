@@ -1,4 +1,5 @@
 /* oxlint-disable react/no-array-index-key -- Table rows and columns have stable positions and may contain identical values. */
+import { lazy, Suspense } from "react";
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
@@ -7,8 +8,9 @@ import { parseDelimitedPreview } from "@t3tools/shared/delimitedPreview";
 
 import { px0Table } from "~/state/projects";
 
-import { FileSurfaceNotice } from "./fileSurfaceChrome";
+import { FileSurfaceLoading, FileSurfaceNotice } from "./fileSurfaceChrome";
 
+const LargeTextViewer = lazy(() => import("./LargeTextViewer"));
 export function DelimitedTablePreview(props: {
   readonly name: string;
   readonly text: string;
@@ -30,12 +32,9 @@ export function DelimitedTablePreview(props: {
     );
   }
   return (
-    <TableView
-      name={props.name}
-      header={fallback.rows[0] ?? []}
-      body={fallback.rows.slice(1).map((cells, index) => ({ line: index + 2, cells }))}
-      truncated={fallback.truncated}
-    />
+    <Suspense fallback={<FileSurfaceLoading />}>
+      <LargeTextViewer key={props.name} {...props} />
+    </Suspense>
   );
 }
 
