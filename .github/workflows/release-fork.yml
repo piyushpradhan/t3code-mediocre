@@ -2,7 +2,8 @@ name: Release fork build
 
 # Fork-only. Publishes this fork's own desktop build to this fork's GitHub
 # Releases so the T3 Code (Alpha) app auto-updates from the fork instead of
-# upstream. macOS arm64 only, unsigned (no Apple certs on this fork).
+# upstream. macOS arm64 only, signed with a stable self-signed certificate
+# (no Apple certs on this fork) so Squirrel.Mac accepts updates.
 #
 # Triggered two ways:
 #   1. `workflow_dispatch` — cut a release whenever you merge code.
@@ -109,8 +110,41 @@ jobs:
       - name: Align package versions to fork release version
         run: node scripts/update-release-package-versions.ts "${{ needs.resolve.outputs.version }}"
 
-      - name: Build unsigned macOS arm64 DMG
+      # A stable self-signed identity keeps the app's designated requirement the
+      # same across releases, which Squirrel.Mac checks before installing an update.
+      # Create the cert with scripts/fork-signing-cert.sh.
+      - name: Import self-signed code-signing certificate
+        env:
+          CERT_P12_BASE64: ${{ secrets.FORK_MAC_SIGNING_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.FORK_MAC_SIGNING_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/fork-signing.keychain-db"
+          keychain_password="$(openssl rand -hex 16)"
+          printf %s "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | xargs)
+          rm "$RUNNER_TEMP/cert.p12"
+          identity="$(security find-identity -p codesigning "$keychain" | awk '/"/ {print $2; exit}')"
+          test -n "$identity"
+          echo "T3CODE_DESKTOP_MAC_SELF_SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+
+      - name: Build self-signed macOS arm64 DMG
         run: vp run dist:desktop:dmg:arm64
+
+      - name: Verify designated requirement is certificate-based
+        run: |
+          set -euo pipefail
+          unpacked="$RUNNER_TEMP/verify-app"
+          mkdir -p "$unpacked"
+          ditto -x -k "$(ls release/*.zip | head -1)" "$unpacked"
+          app="$(ls -d "$unpacked"/*.app | head -1)"
+          codesign --verify --deep --strict "$app"
+          codesign -dr - "$app" 2>&1 | tee /dev/stderr | grep -q 'certificate leaf = H"'
 
       - id: release_files
         name: Resolve release asset list
@@ -137,8 +171,8 @@ jobs:
           body: |
             Fork build based on upstream `${{ needs.resolve.outputs.base_upstream_tag }}`.
 
-            Ad-hoc signed macOS arm64 build (not notarized). After dragging the app
-            to Applications, clear quarantine once:
+            Self-signed macOS arm64 build (not notarized). Installed apps update in place.
+            On a fresh install, after dragging the app to Applications, clear quarantine once:
             `xattr -cr "/Applications/T3 Code (Alpha).app"`
           prerelease: false
           make_latest: true

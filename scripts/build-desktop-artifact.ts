@@ -2855,7 +2855,9 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
           role: "Viewer",
         },
       ],
-      ...(signed ? { sign: path.join(repoRoot, "scripts/sign-macos.ts") } : {}),
+      ...(signed || process.env.T3CODE_DESKTOP_MAC_SELF_SIGN_IDENTITY?.trim()
+        ? { sign: path.join(repoRoot, "scripts/sign-macos.ts") }
+        : {}),
       // Repackaging breaks Electron's signature and Apple Silicon refuses to launch
       // a broken bundle, so unsigned builds get an ad-hoc one. Hardened runtime
       // stays off: it needs library-validation entitlements ad-hoc cannot satisfy.
