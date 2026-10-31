@@ -206,16 +206,6 @@ export interface RunMigrationsOptions {
   readonly toMigrationInclusive?: number | undefined;
 }
 
-/**
- * Run all pending migrations.
- *
- * Creates the migrations tracking table (effect_sql_migrations) if it doesn't exist,
- * then runs any migrations with ID greater than the latest recorded migration.
- *
- * Returns array of [id, name] tuples for migrations that were run.
- *
- * @returns Effect containing array of executed migrations
- */
 // Fork: the thread note once shipped as migration 55, which upstream now uses
 // for OrchestrationV2. Release that ledger id so V2 runs; the note column is
 // kept outside the ledger so future upstream ids never collide with it again.
@@ -239,6 +229,7 @@ const ensureForkThreadNoteColumn = Effect.fn("ensureForkThreadNoteColumn")(funct
   }
 });
 
+/** Runs pending migrations; returns the [id, name] tuples that ran. */
 export const runMigrations = Effect.fn("runMigrations")(function* ({
   toMigrationInclusive,
 }: RunMigrationsOptions = {}) {

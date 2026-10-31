@@ -178,8 +178,6 @@ import {
 } from "./px0.ts";
 import {
   OrchestrationSearchThreadsError,
-  OrchestrationSearchThreadsInput,
-  OrchestrationSearchThreadsResult,
 } from "./threadSearch.ts";
 import {
   ProviderUploadFeedbackError,

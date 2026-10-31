@@ -2856,11 +2856,9 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
         },
       ],
       ...(signed ? { sign: path.join(repoRoot, "scripts/sign-macos.ts") } : {}),
-      // Unsigned builds still need a valid ad-hoc signature: repackaging
-      // invalidates Electron's own, and Apple Silicon refuses to launch a
-      // bundle whose signature is broken ("damaged", or a silent no-open).
-      // Hardened runtime is off because it would require library-validation
-      // entitlements an ad-hoc signature cannot satisfy.
+      // Repackaging breaks Electron's signature and Apple Silicon refuses to launch
+      // a broken bundle, so unsigned builds get an ad-hoc one. Hardened runtime
+      // stays off: it needs library-validation entitlements ad-hoc cannot satisfy.
       ...(signed ? {} : { identity: "-", hardenedRuntime: false }),
       ...(macPasskeySigning
         ? {
