@@ -1,6 +1,6 @@
 import { OrchestrationDispatchCommandError } from "@t3tools/contracts";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
 import * as PeerLinks from "./peer/PeerLinks.ts";
@@ -273,6 +273,7 @@ import {
 import * as AgentSessionScanner from "./project/AgentSessionScanner.ts";
 import * as AgentSessionImporter from "./project/AgentSessionImporter.ts";
 import * as UsageLimitSources from "./usage/UsageLimitSources.ts";
+import { requestUrl } from "./requestUrl.ts";
 
 const CONFIG_DISCOVERY_TIMEOUT = Duration.seconds(5);
 const isProviderUploadFeedbackError = Schema.is(ProviderUploadFeedbackError);
@@ -322,6 +323,7 @@ export const withLateConfigDiscovery = <E, R>(
   liveUpdates: Stream.Stream<ServerConfigStreamEvent, E, R>,
   launcher: EditorDiscovery,
   remoteOpenTargets: RemoteOpenTargets.RemoteOpenTargets["Service"],
+  directEndpoints: Pick<DirectEndpoints.DirectEndpoints["Service"], "resolve">,
 ) => {
   const lateEditorConfig = Stream.fromEffect(launcher.resolveAvailableEditors()).pipe(
     Stream.filter(
@@ -349,7 +351,15 @@ export const withLateConfigDiscovery = <E, R>(
     Stream.map((targets) => ({ type: "remoteOpenTargetsResolved" as const, targets })),
   );
 
-  return Stream.merge(liveUpdates, Stream.merge(lateEditorConfig, lateRemoteOpenTargets)).pipe(
+  const lateDirectEndpoints = Stream.fromEffect(directEndpoints.resolve()).pipe(
+    Stream.catchCause(() => Stream.empty),
+    Stream.map((endpoints) => ({ type: "directEndpointsResolved" as const, endpoints })),
+  );
+
+  return Stream.merge(
+    liveUpdates,
+    Stream.merge(lateEditorConfig, Stream.merge(lateRemoteOpenTargets, lateDirectEndpoints)),
+  ).pipe(
     Stream.mapAccum(
       (): ClientServerConfig => config,
       (current, event): readonly [ClientServerConfig, ReadonlyArray<ServerConfigStreamEvent>] => {
@@ -366,6 +376,13 @@ export const withLateConfigDiscovery = <E, R>(
           }
           case "remoteOpenTargetsResolved": {
             const next = { ...current, remoteOpenTargets: event.targets };
+            return [next, [{ version: 1, type: "snapshot", config: next }]];
+          }
+          case "directEndpointsResolved": {
+            if (JSON.stringify(current.directEndpoints ?? []) === JSON.stringify(event.endpoints)) {
+              return [current, []];
+            }
+            const next = { ...current, directEndpoints: event.endpoints };
             return [next, [{ version: 1, type: "snapshot", config: next }]];
           }
           case "keybindingsUpdated":
@@ -719,7 +736,7 @@ function shouldUseBoundedThreadSnapshot(input: {
 
 // Keep telemetry per socket; several client types can connect simultaneously.
 function readClientAnalyticsProps(request: HttpServerRequest.HttpServerRequest) {
-  const url = HttpServerRequest.toURL(request);
+  const url = requestUrl(request);
   if (Option.isNone(url)) {
     return {};
   }
@@ -769,7 +786,7 @@ function readClientAnalyticsProps(request: HttpServerRequest.HttpServerRequest) 
 function readClientOwners(
   request: HttpServerRequest.HttpServerRequest,
 ): ReadonlyArray<TelemetryOwner> {
-  const url = HttpServerRequest.toURL(request);
+  const url = requestUrl(request);
   if (Option.isNone(url)) {
     return [];
   }
@@ -1351,13 +1368,13 @@ const layerCoreWsRpc = (
       const deviceHostContext =
         yield* Effect.context<Effect.Services<ReturnType<typeof remoteSshDeviceHosts>>>();
       const orchestrationEngine = yield* Orchestrator.OrchestratorV2;
-      const crypto = yield* Crypto.Crypto;
+      const random = yield* SecureRandom.SecureRandom;
       // RPC client ids are only unique within one socket; terminals share viewers across sockets.
-      const terminalViewerPrefix = yield* crypto.randomUUIDv4().pipe(Effect.orDie);
+      const terminalViewerPrefix = yield* random.uuidV4();
       const terminalViewerId = (metadata: { readonly client: { readonly id: number } }) =>
         `${terminalViewerPrefix}:${metadata.client.id}`;
       const serverCommandId = (tag: string) =>
-        crypto.randomUUIDv4().pipe(
+        random.uuidV4().pipe(
           Effect.orDie,
           Effect.map((id) => CommandId.make(`server:${tag}:${id}`)),
         );
@@ -1594,7 +1611,7 @@ const layerCoreWsRpc = (
               provider?.models.find((candidate) => candidate.isDefault)?.slug ??
               provider?.models[0]?.slug ??
               "default";
-            const commandId = CommandId.make(yield* crypto.randomUUIDv4().pipe(Effect.orDie));
+            const commandId = CommandId.make(yield* random.uuidV4());
             const launched = yield* Effect.result(
               startup.enqueueCommand(
                 threadLaunch.launch({
@@ -1798,7 +1815,7 @@ const layerCoreWsRpc = (
       const loadServerConfig = Effect.fn("ws.loadServerConfig")(function* (options: {
         readonly usageLimitsCommand: boolean;
         readonly workspaceSnapshotsOnDemand: boolean;
-        readonly deferRemoteOpenTargets: boolean;
+        readonly deferNetworkDiscovery: boolean;
       }) {
         const keybindingsConfig = yield* keybindings.loadConfigState;
         const currentProviders = yield* providerRegistry.getProviders;
@@ -1818,10 +1835,12 @@ const layerCoreWsRpc = (
         const discovery = yield* resolveOpenDiscoveryForConfig({
           editors: externalLauncher.resolveAvailableEditors(),
           fileManagerRevealKind: externalLauncher.resolveFileManagerRevealKind(),
-          remoteOpenTargets: options.deferRemoteOpenTargets
+          remoteOpenTargets: options.deferNetworkDiscovery
             ? Effect.succeed([])
             : remoteOpenTargets.resolveTargets(),
-          directEndpoints: directEndpoints.resolve(),
+          directEndpoints: options.deferNetworkDiscovery
+            ? directEndpoints.resolveAvailable()
+            : directEndpoints.resolve(),
         });
 
         return {
@@ -2258,7 +2277,7 @@ const layerCoreWsRpc = (
           loadServerConfig({
             usageLimitsCommand: false,
             workspaceSnapshotsOnDemand: false,
-            deferRemoteOpenTargets: false,
+            deferNetworkDiscovery: false,
           }),
         [WS_METHODS.serverSearchAcpRegistry]: (input) =>
           acpRegistryCatalog
@@ -3183,10 +3202,16 @@ const layerCoreWsRpc = (
               const remoteTargets = yield* Effect.forkScoped(remoteOpenTargets.resolveTargets(), {
                 startImmediately: true,
               });
+              const directResult = yield* Effect.forkScoped(
+                directEndpoints
+                  .resolve()
+                  .pipe(Effect.catchCause(() => directEndpoints.resolveAvailable())),
+                { startImmediately: true },
+              );
               const config = yield* loadServerConfig({
                 usageLimitsCommand,
                 workspaceSnapshotsOnDemand,
-                deferRemoteOpenTargets: true,
+                deferNetworkDiscovery: true,
               });
               const keybindingsUpdates = keybindingsChanges.pipe(
                 Stream.map((event) => ({
@@ -3282,9 +3307,15 @@ const layerCoreWsRpc = (
                 rpcInitialItems([
                   { version: 1 as const, type: "snapshot" as const, config: initialConfig },
                 ]),
-                withLateConfigDiscovery(initialConfig, liveUpdates, externalLauncher, {
-                  resolveTargets: () => Fiber.join(remoteTargets),
-                }),
+                withLateConfigDiscovery(
+                  initialConfig,
+                  liveUpdates,
+                  externalLauncher,
+                  {
+                    resolveTargets: () => Fiber.join(remoteTargets),
+                  },
+                  { resolve: () => Fiber.join(directResult) },
+                ),
               );
             }),
           ),
@@ -3381,8 +3412,8 @@ export const layer = Layer.unwrap(
       "/ws",
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest;
-        const requestUrl = HttpServerRequest.toURL(request);
-        if (Option.isNone(requestUrl) || !hasCompatibleOrchestrationProtocol(requestUrl.value)) {
+        const url = requestUrl(request);
+        if (Option.isNone(url) || !hasCompatibleOrchestrationProtocol(url.value)) {
           return HttpServerResponse.jsonUnsafe(
             {
               code: "orchestration_protocol_incompatible",
