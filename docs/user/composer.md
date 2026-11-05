@@ -244,6 +244,12 @@ Type `/` for commands or `$` to add a skill from the selected environment and
 provider. On mobile, both are also available before starting a thread on
 **New task**.
 
+Open **Skills** in the composer to search your library, browse categories, or
+see skills relevant to your draft. Select a skill to add it to the prompt; remove
+its reference from the draft to undo the selection. When offline suggestions are
+available on your environment, you can also select the suggested skill as you type.
+Suggestions never apply themselves.
+
 The slash menu also includes skills unless you turn off **Settings → Chat →
 Show skills in slash menu**, under Advanced. Only skills enabled for the provider are listed.
 

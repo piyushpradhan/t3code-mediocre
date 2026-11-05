@@ -1,3 +1,6 @@
+import { matchInlineSkills } from "@t3tools/shared/inlineSkills";
+import { ComposerSkillBrowser } from "./ComposerSkillBrowser";
+import { resolveProviderSkillsForCwd } from "@t3tools/client-runtime/providerSkills";
 import { useSidebarWorkspaceTabs } from "../workspace/useSystemWorkspaceTabBar";
 import { Button } from "../../components/ui/Button";
 import * as Dialog from "../../components/ui/Dialog";
@@ -31,7 +34,7 @@ import {
 } from "@t3tools/shared/usageLimits";
 import { StackActions, useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { ReactNode } from "react";
-import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 import { I18nManager, Keyboard, Platform, View, type ViewStyle } from "react-native";
 import { composerImageGallery } from "../../lib/composerImageGallery";
 import { filePreviewGallery } from "../../lib/filePreviewGallery";
@@ -521,7 +524,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
       props.serverConfig?.providers ?? [],
       props.serverConfig?.usageLimitSources ?? [],
     );
-  const openUsageLimits = () => {
+  const openUsageLimits = useCallback(() => {
     const report = collectProviderUsageLimits(
       currentModelSelection.instanceId,
       props.serverConfig?.providers ?? [],
@@ -533,7 +536,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
       Dialog.alert("Usage limits unavailable", "This provider does not currently report limits.");
     }
     return report !== null;
-  };
+  }, [currentModelSelection.instanceId, props.serverConfig, onShowUsageLimits]);
 
   const mentionableEnvironments = useMentionableEnvironments();
   const composerMenu = useComposerCommandMenu({
@@ -830,6 +833,22 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
         style={{ maxWidth: props.contentMaxWidth }}
       >
         {props.draftControls}
+        {!isSubmissionLocked && (
+          <ComposerSkillBrowser
+            key={composerDraftKey}
+            skills={
+              selectedProviderStatus
+                ? resolveProviderSkillsForCwd(selectedProviderStatus, props.projectCwd)
+                : []
+            }
+            prompt={draftMessage}
+            environmentId={props.environmentId}
+            onApply={(skill) => {
+              if ([...matchInlineSkills(draftMessage, [skill])].length === 0)
+                props.onChangeDraftMessage(`$${skill.name} ${draftMessage}`);
+            }}
+          />
+        )}
         {!isSubmissionLocked &&
         composerMenu.trigger &&
         (composerMenu.items.length > 0 || composerMenu.trigger.kind === "pull-request") ? (

@@ -1393,6 +1393,10 @@ export function createServerEnvironmentAtoms<R, E>(
         key: ({ environmentId, input }) => JSON.stringify([environmentId, input]),
       },
     }),
+    suggestSkills: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:suggest-skills",
+      tag: WS_METHODS.serverSuggestSkills,
+    }),
     refreshProviders: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:refresh-providers",
       tag: WS_METHODS.serverRefreshProviders,

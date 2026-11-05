@@ -1,3 +1,5 @@
+import { matchInlineSkills } from "@t3tools/shared/inlineSkills";
+import { ComposerSkills } from "./ComposerSkills";
 import { useComposerTypingGuard } from "./useComposerTypingGuard";
 import { insertAttachmentReferencesForDraft } from "./composerAttachmentReferences";
 import { DESKTOP_PASTE_AS_TEXT_EVENT } from "../../lib/desktopPasteAsText";
@@ -3370,6 +3372,18 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
 
               {composerAttachmentFileList}
 
+              {pendingUserInputs.length === 0 && !isComposerCollapsedMobile && (
+                <ComposerSkills
+                  key={composerDraftTargetKey}
+                  skills={selectedProviderSkills}
+                  prompt={prompt}
+                  environmentId={environmentId}
+                  onApply={(skill) => {
+                    if ([...matchInlineSkills(promptRef.current, [skill])].length === 0)
+                      applyPromptReplacementStable(0, 0, `$${skill.name} `);
+                  }}
+                />
+              )}
               <div className="relative">
                 {previewFile ? (
                   <ComposerFilePreviewDialog

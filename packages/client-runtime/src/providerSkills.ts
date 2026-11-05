@@ -356,3 +356,101 @@ export function createProviderWorkspaceSnapshotRefreshAtomFamily(input: {
   ): Atom.Atom<ProviderWorkspaceSnapshotRefreshState> =>
     family({ environmentId: target.environmentId, instanceId: target.instanceId, cwd: target.cwd });
 }
+
+const skillCategoryTerms = {
+  Engineering:
+    /code|debug|test|refactor|typescript|backend|frontend|database|deploy|review|git|api/i,
+  Design: /design|animation|visual|ui\b|ux\b|image|brand|video|motion/i,
+  Writing: /writ|copy|document|edit|voice|content/i,
+  Marketing: /market|seo|campaign|conversion|sales|launch|growth/i,
+  Research: /research|learn|investigat|explain|analys/i,
+};
+
+export function providerSkillCategory(skill: ServerProviderSkill): string {
+  const text = `${skill.name} ${skill.shortDescription ?? skill.description ?? ""}`;
+  return (
+    Object.entries(skillCategoryTerms).find(([, pattern]) => pattern.test(text))?.[0] ?? "Other"
+  );
+}
+
+const skillPromptStopWords = new Set([
+  "the",
+  "and",
+  "for",
+  "with",
+  "this",
+  "that",
+  "you",
+  "our",
+  "can",
+  "have",
+  "want",
+  "please",
+  "from",
+  "use",
+  "when",
+  "user",
+  "skill",
+  "generate",
+  "help",
+  "helps",
+  "about",
+  "would",
+  "could",
+  "should",
+  "need",
+  "some",
+  "into",
+  "also",
+  "make",
+]);
+
+function skillSearchTerms(text: string): Set<string> {
+  const withoutUrls = text
+    .toLowerCase()
+    .replace(/(?:https?:\/\/|www\.)\S+|\b[\w-]+(?:\.[\w-]+)+(?:\/\S*)?/g, " ");
+  return new Set(
+    (withoutUrls.match(/[\p{L}\p{N}]{3,}/gu) ?? [])
+      .map((word) => (word.length > 4 ? word.replace(/s$/, "") : word))
+      .filter((word) => !skillPromptStopWords.has(word)),
+  );
+}
+
+export function shortlistProviderSkills(
+  skills: ReadonlyArray<ServerProviderSkill>,
+  prompt: string,
+  limit = 6,
+): ServerProviderSkill[] {
+  const terms = [...skillSearchTerms(prompt)];
+  if (terms.length === 0) return [];
+  const documents = dedupeProviderSkillsByName(skills.filter(isProviderSkillUserInvocable)).map(
+    (skill) => ({
+      skill,
+      name: skillSearchTerms(skill.name),
+      description: skillSearchTerms(`${skill.shortDescription ?? ""} ${skill.description ?? ""}`),
+    }),
+  );
+  const weights = new Map(
+    terms.map((term) => [
+      term,
+      Math.log(
+        1 +
+          documents.length /
+            (1 + documents.filter((doc) => doc.name.has(term) || doc.description.has(term)).length),
+      ),
+    ]),
+  );
+  return documents
+    .map(({ skill, name, description }) => ({
+      skill,
+      score: terms.reduce(
+        (sum, term) =>
+          sum + (weights.get(term) ?? 0) * (name.has(term) ? 3 : description.has(term) ? 1 : 0),
+        0,
+      ),
+    }))
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score || a.skill.name.localeCompare(b.skill.name))
+    .slice(0, limit)
+    .map(({ skill }) => skill);
+}

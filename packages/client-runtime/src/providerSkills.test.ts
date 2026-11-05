@@ -9,6 +9,8 @@ import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {
+  shortlistProviderSkills,
+  providerSkillCategory,
   createProviderWorkspaceSnapshotRefreshAtomFamily,
   getProviderSkillsForSlashMenu,
   hasCompleteProviderWorkspaceSnapshot,
@@ -399,4 +401,52 @@ describe("provider workspace snapshot refresh atom", () => {
     expect(run).not.toHaveBeenCalled();
     unmount();
   });
+});
+
+it("shortlists invocable skills using prompt intent and names, without duplicates", () => {
+  const skills = [
+    { name: "review", path: "/review", enabled: true, description: "Review code and find bugs" },
+    { name: "design", path: "/design", enabled: true, description: "Design a website" },
+    { name: "hidden-review", path: "/hidden", enabled: true, userInvocable: false },
+    { name: "disabled-review", path: "/disabled", enabled: false },
+  ];
+  expect(
+    shortlistProviderSkills([...skills, skills[0]!], "Please review the code for bugs").map(
+      (s) => s.name,
+    ),
+  ).toEqual(["review"]);
+  expect(shortlistProviderSkills(skills, "the and please")).toEqual([]);
+  expect(shortlistProviderSkills(skills, "write poetry")).toEqual([]);
+  expect(providerSkillCategory(skills[1]!)).toBe("Design");
+});
+
+it("keeps domain fragments and generic request words out of skill recommendations", () => {
+  const skills = [
+    {
+      name: "caveman-commit",
+      path: "/commit",
+      enabled: true,
+      description: "Generate commit messages",
+    },
+    { name: "compress", path: "/compress", enabled: true, description: "Compress memory files" },
+    {
+      name: "comments",
+      path: "/comments",
+      enabled: true,
+      description: "Generate comments on code",
+    },
+    {
+      name: "copywriting",
+      path: "/copywriting",
+      enabled: true,
+      description: "Write blog posts and marketing content for product distribution",
+    },
+  ];
+  expect(
+    shortlistProviderSkills(
+      skills,
+      "Generate a blog for me that helps with the distribution of example.com",
+      2,
+    ).map((s) => s.name),
+  ).toEqual(["copywriting"]);
 });

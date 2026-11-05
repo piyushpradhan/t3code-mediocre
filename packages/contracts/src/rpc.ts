@@ -178,9 +178,7 @@ import {
   Px0TableInput,
   Px0TableResult,
 } from "./px0.ts";
-import {
-  OrchestrationSearchThreadsError,
-} from "./threadSearch.ts";
+import { OrchestrationSearchThreadsError } from "./threadSearch.ts";
 import {
   ProviderUploadFeedbackError,
   ProviderUploadFeedbackInput,
@@ -533,6 +531,7 @@ export const WS_METHODS = {
   serverGetConfig: "server.getConfig",
   serverGetNpmRelease: "server.getNpmRelease",
   serverRefreshProviders: "server.refreshProviders",
+  serverSuggestSkills: "server.suggestSkills",
   serverUpdateProvider: "server.updateProvider",
   serverUpdateServer: "server.updateServer",
   serverUpdateServerWithProgress: "server.updateServerWithProgress",
@@ -670,6 +669,25 @@ const WsServerGetConfigRpc = Rpc.make(WS_METHODS.serverGetConfig, {
   payload: Schema.Struct({}),
   success: ServerConfig,
   error: Schema.Union([KeybindingsConfigError, ServerSettingsError, EnvironmentAuthorizationError]),
+});
+
+export const ServerSuggestSkillsInput = Schema.Struct({
+  prompt: Schema.String.check(Schema.isMaxLength(8000)),
+  candidates: Schema.Array(
+    Schema.Struct({
+      name: TrimmedNonEmptyString,
+      description: Schema.String.check(Schema.isMaxLength(300)),
+    }),
+  ).check(Schema.isMaxLength(6)),
+});
+export const ServerSuggestSkillsResult = Schema.Struct({
+  name: Schema.NullOr(Schema.String),
+  available: Schema.Boolean,
+});
+const WsServerSuggestSkillsRpc = Rpc.make(WS_METHODS.serverSuggestSkills, {
+  payload: ServerSuggestSkillsInput,
+  success: ServerSuggestSkillsResult,
+  error: EnvironmentAuthorizationError,
 });
 
 export const WsServerRefreshProvidersRpc = Rpc.make(WS_METHODS.serverRefreshProviders, {
@@ -2093,6 +2111,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerProbeRpc,
   WsServerGetConfigRpc,
   WsServerRefreshProvidersRpc,
+  WsServerSuggestSkillsRpc,
   WsServerUpdateProviderRpc,
   WsProviderConsumeResetCreditRpc,
   WsProviderAuthStartRpc,

@@ -72,7 +72,9 @@ describe("command permissions", () => {
       Effect.gen(function* () {
         const registry = yield* setup;
         const refresh = createCommandPermissions(runtime, WS_METHODS.serverRefreshProviders);
+        const suggestions = createCommandPermissions(runtime, WS_METHODS.serverSuggestSkills);
         registry.set(sessions(env), AsyncResult.success(grant(true)));
+        expect(registry.get(suggestions.permissionAtom(env))).toBe(false);
         expect(registry.get(refresh.permissionAtom(env))).toBe(false);
         expect((yield* refresh.authorize(registry, env).pipe(Effect.flip))._tag).toBe(
           "EnvironmentAuthorizationError",
@@ -85,6 +87,8 @@ describe("command permissions", () => {
             permissions: [AuthOrchestrationReadScope],
           }),
         );
+        expect(registry.get(suggestions.permissionAtom(env))).toBe(true);
+        yield* suggestions.authorize(registry, env);
         expect(registry.get(refresh.permissionAtom(env))).toBe(true);
         yield* refresh.authorize(registry, env);
         registry.set(sessions(other), AsyncResult.success(grant(false)));

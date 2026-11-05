@@ -60,11 +60,13 @@ export function ContextChipPopover(props: {
   label: string;
   copyMarkdown?: string | undefined;
   accessibleLabel: string;
+  openOnHover?: boolean;
   children: ReactNode;
 }) {
   return (
     <Popover>
       <PopoverTrigger
+        openOnHover={props.openOnHover}
         render={
           <ContextChip
             kind={props.kind}
