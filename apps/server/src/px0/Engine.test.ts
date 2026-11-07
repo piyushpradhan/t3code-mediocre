@@ -1,6 +1,7 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it as effectIt } from "@effect/vitest";
 import * as Net from "@t3tools/shared/Net";
+import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -64,16 +65,7 @@ const makeFakeBinary = Effect.gen(function* () {
 });
 
 const withPx0Binary = (bin: string) =>
-  Effect.gen(function* () {
-    const original = process.env["PX0_BINARY"];
-    process.env["PX0_BINARY"] = bin;
-    yield* Effect.addFinalizer(() =>
-      Effect.sync(() => {
-        if (original === undefined) delete process.env["PX0_BINARY"];
-        else process.env["PX0_BINARY"] = original;
-      }),
-    );
-  });
+  Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: { PX0_BINARY: bin } })));
 
 const testLayer = Px0Engine.layer.pipe(
   Layer.provideMerge(NodeServices.layer),
@@ -89,10 +81,9 @@ describe("Px0Engine", () => {
     run(
       Effect.gen(function* () {
         const { bin, dir } = yield* makeFakeBinary;
-        yield* withPx0Binary(bin);
         const engine = yield* Px0Engine.Px0Engine;
 
-        const meta = yield* engine.meta({ cwd: dir });
+        const meta = yield* engine.meta({ cwd: dir }).pipe(withPx0Binary(bin));
         expect(meta.ready).toBe(true);
         expect(meta.name).toBe("fake");
         expect(meta.version).toBe("0.0.0-test");
@@ -112,10 +103,11 @@ describe("Px0Engine", () => {
     run(
       Effect.gen(function* () {
         const { dir } = yield* makeFakeBinary;
-        yield* withPx0Binary("/nonexistent/px0-does-not-exist");
         const engine = yield* Px0Engine.Px0Engine;
 
-        const error = yield* engine.meta({ cwd: dir }).pipe(Effect.flip);
+        const error = yield* engine
+          .meta({ cwd: dir })
+          .pipe(withPx0Binary("/nonexistent/px0-does-not-exist"), Effect.flip);
         expect(error._tag).toBe("Px0Error");
         expect(error.operation).toBe("spawn");
       }),

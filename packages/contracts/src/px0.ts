@@ -1,27 +1,12 @@
 import * as Schema from "effect/Schema";
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
 
-/**
- * Read-only contracts for the px0 code-viewer engine.
- *
- * px0 runs as a headless local HTTP server (a bundled Go binary) indexing one
- * workspace root. The T3 server spawns it per project and forwards these
- * requests over the typed WebSocket transport, so the Files surface gets px0's
- * fast index, search, Chroma highlighting, outline, and git diff without the
- * client talking HTTP to a second origin.
- *
- * Paths in these inputs are workspace-relative (px0 keys every request by its
- * own root, selected here via `cwd`).
- */
+/** px0 paths are relative to the workspace selected by cwd. */
 
 const PX0_PATH_MAX_LENGTH = 4096;
 
 const Px0Cwd = TrimmedNonEmptyString.check(Schema.isMaxLength(PX0_PATH_MAX_LENGTH));
 const Px0RelPath = TrimmedNonEmptyString.check(Schema.isMaxLength(PX0_PATH_MAX_LENGTH));
-
-// ---------------------------------------------------------------------------
-// meta
-// ---------------------------------------------------------------------------
 
 export const Px0MetaInput = Schema.Struct({
   cwd: Px0Cwd,
@@ -40,10 +25,6 @@ export const Px0MetaResult = Schema.Struct({
   version: Schema.String,
 });
 export type Px0MetaResult = typeof Px0MetaResult.Type;
-
-// ---------------------------------------------------------------------------
-// tree
-// ---------------------------------------------------------------------------
 
 export const Px0TreeInput = Schema.Struct({
   cwd: Px0Cwd,
@@ -65,10 +46,6 @@ export const Px0TreeResult = Schema.Struct({
 });
 export type Px0TreeResult = typeof Px0TreeResult.Type;
 
-// ---------------------------------------------------------------------------
-// find (fuzzy file open)
-// ---------------------------------------------------------------------------
-
 export const Px0FindInput = Schema.Struct({
   cwd: Px0Cwd,
   q: Schema.String,
@@ -87,10 +64,6 @@ export const Px0FindResults = Schema.Struct({
   results: Schema.Array(Px0FindResult),
 });
 export type Px0FindResults = typeof Px0FindResults.Type;
-
-// ---------------------------------------------------------------------------
-// file
-// ---------------------------------------------------------------------------
 
 export const Px0FileInput = Schema.Struct({
   cwd: Px0Cwd,
@@ -126,10 +99,6 @@ export const Px0FileResult = Schema.Struct({
 });
 export type Px0FileResult = typeof Px0FileResult.Type;
 
-// ---------------------------------------------------------------------------
-// table
-// ---------------------------------------------------------------------------
-
 export const Px0TableInput = Schema.Struct({
   cwd: Px0Cwd,
   path: Px0RelPath,
@@ -150,10 +119,6 @@ export const Px0TableResult = Schema.Struct({
   truncated: Schema.Boolean,
 });
 export type Px0TableResult = typeof Px0TableResult.Type;
-
-// ---------------------------------------------------------------------------
-// search
-// ---------------------------------------------------------------------------
 
 export const Px0SearchInput = Schema.Struct({
   cwd: Px0Cwd,
@@ -188,10 +153,6 @@ export const Px0SearchResult = Schema.Struct({
 });
 export type Px0SearchResult = typeof Px0SearchResult.Type;
 
-// ---------------------------------------------------------------------------
-// outline
-// ---------------------------------------------------------------------------
-
 export const Px0OutlineInput = Schema.Struct({
   cwd: Px0Cwd,
   path: Px0RelPath,
@@ -211,10 +172,6 @@ export const Px0OutlineResult = Schema.Struct({
   symbols: Schema.Array(Px0Symbol),
 });
 export type Px0OutlineResult = typeof Px0OutlineResult.Type;
-
-// ---------------------------------------------------------------------------
-// diff / gutter
-// ---------------------------------------------------------------------------
 
 export const Px0DiffInput = Schema.Struct({
   cwd: Px0Cwd,
@@ -237,10 +194,6 @@ export const Px0GutterResult = Schema.Struct({
   deleted: Schema.Array(Schema.Finite),
 });
 export type Px0GutterResult = typeof Px0GutterResult.Type;
-
-// ---------------------------------------------------------------------------
-// error
-// ---------------------------------------------------------------------------
 
 function decodedPx0ErrorMessage(props: object): string | undefined {
   if (!("message" in props)) return undefined;
@@ -266,6 +219,6 @@ export class Px0Error extends Schema.TaggedError<Px0Error>()("Px0Error", {
       ...props,
       message:
         decodedPx0ErrorMessage(props) ?? `px0 ${props.operation} failed for '${props.cwd ?? ""}'.`,
-    } as Px0Error);
+    });
   }
 }

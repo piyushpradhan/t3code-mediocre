@@ -22,6 +22,7 @@ import { Platform as HostProcessPlatform } from "@t3tools/shared/HostProcess";
 import * as Net from "@t3tools/shared/Net";
 import { resolveSpawnCommand } from "@t3tools/shared/shell";
 import { Px0 } from "@t3tools/px0-sdk";
+import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -31,16 +32,6 @@ import * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-
-/**
- * Runs a headless px0 code-viewer per workspace root and proxies its read API.
- *
- * px0 is a bundled Go binary that indexes one root and answers fast
- * `/api/tree`, `/api/file`, `/api/table`, `/api/search`, `/api/outline`,
- * `/api/diff`, and `/api/gutter` requests. T3 spawns it on a reserved loopback port and talks to
- * it through the vendored `@t3tools/px0-sdk` client, then exposes the results
- * over the typed WebSocket transport.
- */
 
 const PX0_DEFAULT_BINARY = "px0";
 
@@ -69,7 +60,7 @@ export class Px0Engine extends Context.Service<
   }
 >()("t3/px0/Engine/Px0Engine") {}
 
-/** @public Service construction is part of the canonical Effect module API. */
+/** @public */
 export const make = Effect.gen(function* Px0EngineMake() {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const net = yield* Net.NetService;
@@ -82,11 +73,14 @@ export const make = Effect.gen(function* Px0EngineMake() {
   const clientsRef = yield* Ref.make<ReadonlyMap<string, Px0>>(new Map());
   const spawnSemaphore = yield* Semaphore.make(1);
 
-  const spawnClient = (cwd: string): Effect.Effect<Px0, Px0Error> =>
-    Effect.gen(function* () {
+  const spawnClient = Effect.fn("Px0Engine.spawnClient")(
+    function* (cwd: string) {
       // Resolved per spawn so an override (e.g. a bundled or test binary) takes
       // effect without rebuilding the service.
-      const binaryPath = process.env["PX0_BINARY"] ?? PX0_DEFAULT_BINARY;
+      const binaryPath = yield* Config.String("PX0_BINARY").pipe(
+        Config.withDefault(PX0_DEFAULT_BINARY),
+        Effect.mapError((cause) => new Px0Error({ operation: "spawn", cwd, cause })),
+      );
       const port = yield* net
         .reserveLoopbackPort()
         .pipe(Effect.mapError((cause) => new Px0Error({ operation: "spawn", cwd, cause })));
@@ -133,37 +127,37 @@ export const make = Effect.gen(function* Px0EngineMake() {
         catch: (cause) => new Px0Error({ operation: "spawn", cwd, cause }),
       });
       return client;
-    }).pipe(Effect.provideService(Scope.Scope, engineScope));
+    },
+    Effect.provideService(Scope.Scope, engineScope),
+  );
 
-  const ensure = (cwd: string): Effect.Effect<Px0, Px0Error, Scope.Scope> =>
-    Effect.gen(function* () {
-      const existing = yield* Ref.get(clientsRef);
-      const cached = existing.get(cwd);
-      if (cached) return cached;
-      return yield* Semaphore.withPermit(spawnSemaphore)(
-        Effect.gen(function* () {
-          const current = yield* Ref.get(clientsRef);
-          const cachedNow = current.get(cwd);
-          if (cachedNow) return cachedNow;
-          const client = yield* spawnClient(cwd);
-          yield* Ref.update(clientsRef, (map) => new Map(map).set(cwd, client));
-          return client;
-        }),
-      );
-    });
+  const ensure = Effect.fn("Px0Engine.ensure")(function* (cwd: string) {
+    const existing = yield* Ref.get(clientsRef);
+    const cached = existing.get(cwd);
+    if (cached) return cached;
+    return yield* Semaphore.withPermit(spawnSemaphore)(
+      Effect.gen(function* () {
+        const current = yield* Ref.get(clientsRef);
+        const cachedNow = current.get(cwd);
+        if (cachedNow) return cachedNow;
+        const client = yield* spawnClient(cwd);
+        yield* Ref.update(clientsRef, (map) => new Map(map).set(cwd, client));
+        return client;
+      }),
+    );
+  });
 
-  const call = <A>(
+  const call = Effect.fn("Px0Engine.call")(function* <A>(
     operation: string,
     cwd: string,
     run: (client: Px0) => Promise<A>,
-  ): Effect.Effect<A, Px0Error, Scope.Scope> =>
-    Effect.gen(function* () {
-      const client = yield* ensure(cwd);
-      return yield* Effect.tryPromise({
-        try: () => run(client),
-        catch: (cause) => new Px0Error({ operation, cwd, cause }),
-      });
+  ) {
+    const client = yield* ensure(cwd);
+    return yield* Effect.tryPromise({
+      try: () => run(client),
+      catch: (cause) => new Px0Error({ operation, cwd, cause }),
     });
+  });
 
   return Px0Engine.of({
     meta: Effect.fn("Px0Engine.meta")((input: Px0MetaInput) =>
