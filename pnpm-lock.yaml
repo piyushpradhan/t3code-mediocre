@@ -1981,8 +1981,8 @@ importers:
   packages/px0-sdk:
     devDependencies:
       typescript:
-        specifier: 'catalog:'
-        version: '@tsc-rs/typescript@0.8.0'
+        specifier: ~6.0.3
+        version: 6.0.3
 
   packages/secret-provider-core:
     dependencies:
