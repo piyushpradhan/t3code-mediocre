@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-mkdir -p ~/.codex
-printf '%s' "$CODEX_AUTH_JSON" > ~/.codex/auth.json
-
 # A completed Codex process can report unfinished work and still exit zero.
 # Only the checker decides whether a repair succeeded.
 for attempt in 1 2 3; do

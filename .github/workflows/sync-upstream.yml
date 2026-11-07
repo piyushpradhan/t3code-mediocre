@@ -33,11 +33,13 @@ jobs:
           fetch-depth: 0
           # GITHUB_TOKEN cannot push commits that touch .github/workflows, and upstream
           # edits them often. SYNC_TOKEN: fine-grained PAT with Contents, Workflows and
-          # Pull requests read/write on this repo.
+          # Pull requests and Secrets read/write on this repo.
           token: ${{ secrets.SYNC_TOKEN || github.token }}
 
       - name: Test typecheck recovery
-        run: python3 .github/scripts/repair-upstream-typecheck.test.py
+        run: |
+          python3 -B .github/scripts/repair-upstream-typecheck.test.py
+          python3 -B .github/scripts/sync-upstream-auth.test.py
 
       - id: merge
         name: Merge upstream
@@ -56,12 +58,22 @@ jobs:
             echo "result=conflict" >> "$GITHUB_OUTPUT"
           fi
 
+      - id: auth
+        name: Restore Codex login
+        if: steps.merge.outputs.result == 'conflict'
+        env:
+          CODEX_HOME: ${{ runner.temp }}/sync-upstream-codex
+          # Use a dedicated login; sharing it with another machine races token rotation.
+          CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+        run: |
+          bash .github/scripts/sync-upstream-auth.sh prepare
+          echo "CODEX_HOME=$CODEX_HOME" >> "$GITHUB_ENV"
+
       - name: Resolve conflicts with Codex
         if: steps.merge.outputs.result == 'conflict'
         timeout-minutes: 30
         env:
-          # CODEX_AUTH_JSON: contents of ~/.codex/auth.json after `codex login` with ChatGPT.
-          CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
           MODEL: ${{ vars.SYNC_RESOLVE_MODEL || 'gpt-6-luna' }}
           PROMPT: |
             A `git merge upstream/main` is in progress in this repository and has conflicts.
@@ -76,7 +88,6 @@ jobs:
           if git diff --name-only --diff-filter=U | grep -qx pnpm-lock.yaml; then
             git checkout --theirs pnpm-lock.yaml && git add pnpm-lock.yaml
           fi
-          mkdir -p ~/.codex && printf '%s' "$CODEX_AUTH_JSON" > ~/.codex/auth.json
           npx -y @openai/codex@latest exec --dangerously-bypass-approvals-and-sandbox \
             -m "$MODEL" -c model_reasoning_effort=medium "$PROMPT"
           if [ -n "$(git diff --name-only --diff-filter=U)" ] || git grep -qE '^(<<<<<<<|>>>>>>>) ' -- .; then
@@ -112,7 +123,6 @@ jobs:
         if: steps.typecheck.outcome == 'failure'
         timeout-minutes: 60
         env:
-          CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
           MODEL: ${{ vars.SYNC_REPAIR_MODEL || 'gpt-6.1-sol' }}
           PROMPT: |
             A `git merge upstream/main` is in progress. Conflicts have been resolved, but
@@ -136,6 +146,12 @@ jobs:
           fi
           vpr typecheck
           git add -u
+
+      - name: Preserve refreshed Codex login
+        if: always() && steps.auth.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+        run: bash .github/scripts/sync-upstream-auth.sh save
 
       - name: Push main and release
         if: steps.merge.outputs.result == 'clean' || steps.merge.outputs.result == 'conflict'
