@@ -46,10 +46,10 @@ export function ComposerSkills({
     name: string;
   } | null>(null);
   const available = dedupeProviderSkillsByName(skills.filter(isProviderSkillUserInvocable));
-  const candidates = shortlistProviderSkills(available, prompt);
   const canSuggest = useAtomValue(serverEnvironment.suggestSkills.permissionAtom(environmentId));
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- debounce model RPCs and ignore replies for obsolete drafts or environments
   useEffect(() => {
+    const candidates = shortlistProviderSkills(skills, prompt);
     if (!canSuggest || prompt.trim().length < 12 || candidates.length === 0) return;
     let current = true;
     const timer = setTimeout(() => {
@@ -80,7 +80,7 @@ export function ComposerSkills({
       current = false;
       clearTimeout(timer);
     };
-  }, [prompt, candidates, environmentId, canSuggest]);
+  }, [prompt, skills, environmentId, canSuggest]);
   const suggested =
     suggestion?.prompt === prompt && suggestion.environmentId === environmentId
       ? available.find(
