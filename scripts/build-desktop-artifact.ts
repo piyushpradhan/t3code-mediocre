@@ -2828,6 +2828,9 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   if (platform === "mac") {
     const path = yield* Path.Path;
     const repoRoot = yield* RepoRoot;
+    const selfSignIdentity = yield* Config.String("T3CODE_DESKTOP_MAC_SELF_SIGN_IDENTITY").pipe(
+      Config.withDefault(""),
+    );
     buildConfig.mac = {
       target: target === "dmg" ? [target, "zip"] : [target],
       icon: "icon.icns",
@@ -2865,7 +2868,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
           role: "Viewer",
         },
       ],
-      ...(signed || process.env.T3CODE_DESKTOP_MAC_SELF_SIGN_IDENTITY?.trim()
+      ...(signed || selfSignIdentity.trim()
         ? { sign: path.join(repoRoot, "scripts/sign-macos.ts") }
         : {}),
       // Repackaging breaks Electron's signature and Apple Silicon refuses to launch
