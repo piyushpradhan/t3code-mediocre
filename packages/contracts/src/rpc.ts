@@ -145,6 +145,7 @@ import {
   GitResolvePullRequestResult,
   GitRunStackedActionInput,
   VcsStatusInput,
+  VcsBranchStatus,
   VcsStatusSubscriptionInput,
   VcsStatusResult,
   VcsStatusStreamEvent,
@@ -638,6 +639,8 @@ export const WS_METHODS = {
   subscribeProjectClones: "subscribeProjectClones",
 
   subscribeVcsStatus: "subscribeVcsStatus",
+  subscribeVcsBranch: "subscribeVcsBranch",
+  vcsRefreshBranch: "vcs.refreshBranch",
   subscribeWorktreeSetup: "subscribeWorktreeSetup",
   worktreeSetupCancel: "worktreeSetup.cancel",
   subscribeTerminalMetadata: "subscribeTerminalMetadata",
@@ -1506,6 +1509,19 @@ const WsProviderUploadFeedbackRpc = Rpc.make(WS_METHODS.providerUploadFeedback, 
   error: Schema.Union([ProviderUploadFeedbackError, EnvironmentAuthorizationError]),
 });
 
+const WsSubscribeVcsBranchRpc = Rpc.make(WS_METHODS.subscribeVcsBranch, {
+  payload: VcsStatusInput,
+  success: VcsBranchStatus,
+  error: Schema.Union([GitManagerServiceError, EnvironmentAuthorizationError]),
+  stream: true,
+});
+
+const WsVcsRefreshBranchRpc = Rpc.make(WS_METHODS.vcsRefreshBranch, {
+  payload: VcsStatusInput,
+  success: Schema.Void,
+  error: Schema.Union([GitManagerServiceError, EnvironmentAuthorizationError]),
+});
+
 const WsSubscribeVcsStatusRpc = Rpc.make(WS_METHODS.subscribeVcsStatus, {
   payload: VcsStatusSubscriptionInput,
   success: VcsStatusStreamEvent,
@@ -1901,6 +1917,15 @@ const WsOrchestrationV2GetThreadTitlesRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS
   error: Schema.Union([OrchestrationV2GetShellSnapshotError, EnvironmentAuthorizationError]),
 });
 
+const WsOrchestrationV2GetThreadLinkMetadataRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.getThreadLinkMetadata,
+  {
+    payload: OrchestrationV2RpcSchemas.getThreadLinkMetadata.input,
+    success: OrchestrationV2RpcSchemas.getThreadLinkMetadata.output,
+    error: Schema.Union([OrchestrationV2GetShellSnapshotError, EnvironmentAuthorizationError]),
+  },
+);
+
 const WsOrchestrationV2GetWorktreeThreadIdsRpc = Rpc.make(
   ORCHESTRATION_V2_WS_METHODS.getWorktreeThreadIds,
   {
@@ -2269,6 +2294,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsMcpAppsUpdateModelContextRpc,
   WsProviderUploadFeedbackRpc,
   WsSubscribeVcsStatusRpc,
+  WsSubscribeVcsBranchRpc,
+  WsVcsRefreshBranchRpc,
   WsSubscribeWorktreeSetupRpc,
   WsWorktreeSetupCancelRpc,
   WsVcsPullRpc,
@@ -2333,6 +2360,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2GetArchivedShellSnapshotRpc,
   WsOrchestrationV2GetThreadFamilyRpc,
   WsOrchestrationV2GetThreadTitlesRpc,
+  WsOrchestrationV2GetThreadLinkMetadataRpc,
   WsOrchestrationV2GetWorktreeThreadIdsRpc,
   WsOrchestrationV2GetOlderSettledThreadsRpc,
   WsOrchestrationV2GetThreadProjectionRpc,
