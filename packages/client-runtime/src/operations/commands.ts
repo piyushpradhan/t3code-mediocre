@@ -134,8 +134,6 @@ export interface UpdateThreadMetadataInput extends ThreadCommandInput {
   readonly worktreePath?: string | null;
   readonly regenerateTitle?: boolean;
   readonly linkedPullRequest?: ThreadLinkedPullRequest | null;
-  /** Fork: set or clear (null) the thread note. */
-  readonly note?: string | null;
   /** Apply only while no message or run has landed on the thread. */
   readonly expectedEmpty?: boolean;
 }
@@ -621,7 +619,6 @@ export const updateThreadMetadata = Effect.fn("EnvironmentCommands.updateThreadM
       input.worktreePath !== undefined ||
       input.regenerateTitle !== undefined ||
       input.linkedPullRequest !== undefined ||
-      input.note !== undefined ||
       input.limitRecovery !== undefined
     ) {
       result = yield* dispatch({
@@ -637,7 +634,6 @@ export const updateThreadMetadata = Effect.fn("EnvironmentCommands.updateThreadM
         ...(input.linkedPullRequest === undefined
           ? {}
           : { linkedPullRequest: input.linkedPullRequest }),
-        ...(input.note === undefined ? {} : { note: input.note }),
       });
     }
     if (input.modelSelection !== undefined) {

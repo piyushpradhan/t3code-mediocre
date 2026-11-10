@@ -39,7 +39,6 @@ import {
   ScheduledTaskId,
   ThreadId,
   TrimmedNonEmptyString,
-  TrimmedString,
   TurnItemId,
 } from "./baseSchemas.ts";
 import { AuthMcpClientAccess } from "./auth.ts";
@@ -456,8 +455,6 @@ export const OrchestrationV2AppThread = Schema.Struct({
   linkedPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
   pullRequests: Schema.optional(Schema.Array(ThreadPullRequestLink)),
   branchPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
-  /** Fork: markdown note bound to the thread. Optional so upstream payloads decode. */
-  note: Schema.optional(Schema.NullOr(TrimmedString)),
   activeProviderThreadId: Schema.NullOr(ProviderThreadId),
   historyOrigin: Schema.optional(OrchestrationV2ThreadHistoryOrigin),
   linkOrigin: Schema.optional(OrchestrationV2LinkOrigin),
@@ -3074,8 +3071,6 @@ export const OrchestrationV2Command = Schema.Union([
     limitRecovery: Schema.optional(Schema.NullOr(OrchestrationV2LimitRecoveryUpdate)),
     /** Link (object) or unlink (null) a pull request; absent leaves it unchanged. */
     linkedPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
-    /** Fork: set (string) or clear (null) the thread note; absent leaves it unchanged. */
-    note: Schema.optional(Schema.NullOr(TrimmedString)),
   }),
   Schema.Struct({
     type: Schema.Literal("thread.pull-request.link"),

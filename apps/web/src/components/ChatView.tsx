@@ -177,7 +177,6 @@ import {
   usePreviewMiniPlayerStore,
 } from "../previewMiniPlayerStore";
 import { threadPullRequestPanelTarget } from "./pullRequest/pullRequestDetail.logic";
-import { FloatingNote } from "./FloatingNote";
 import { LinkPullRequestDialogHost } from "./pullRequest/LinkPullRequestDialog";
 import { GuestPendingMessages } from "./chat/GuestShareControls";
 import { useDeviceState } from "~/state/device";
@@ -3402,20 +3401,6 @@ export default function ChatView(props: ChatViewProps) {
             onDrop={workspaceFileDropHandlers.onDrop}
           >
             <ThreadFind onClose={focusComposerStable} />
-            {serverProjection !== null ? (
-              <FloatingNote
-                key={activeThreadKey ?? "none"}
-                threadKey={activeThreadKey}
-                note={serverProjection.thread.note ?? null}
-                onSave={(note) => {
-                  if (activeThreadRef === null) return;
-                  void updateThreadMetadata({
-                    environmentId: activeThreadRef.environmentId,
-                    input: { threadId: activeThreadRef.threadId, note },
-                  });
-                }}
-              />
-            ) : null}
             {isWorkspaceFileDragActive ? <WorkspaceFileDropOverlay /> : null}
             <ChatBannerLane
               environmentId={activeThread.environmentId}

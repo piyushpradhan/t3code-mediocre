@@ -220,9 +220,7 @@ export interface RunMigrationsOptions {
   readonly toMigrationInclusive?: number | undefined;
 }
 
-// Fork: the thread note once shipped as migration 55, which upstream now uses
-// for OrchestrationV2. Release that ledger id so V2 runs; the note column is
-// kept outside the ledger so future upstream ids never collide with it again.
+// Release the fork's former note migration id, which upstream now uses for OrchestrationV2.
 const releaseForkThreadNoteMigrationId = Effect.fn("releaseForkThreadNoteMigrationId")(
   function* () {
     const sql = yield* SqlClient.SqlClient;
@@ -233,15 +231,6 @@ const releaseForkThreadNoteMigrationId = Effect.fn("releaseForkThreadNoteMigrati
     yield* sql`DELETE FROM effect_sql_migrations WHERE migration_id = 55 AND name = 'ProjectionThreadNote'`;
   },
 );
-
-// Fork: the V1 importer copies projection_threads.note into V2 threads.
-const ensureForkThreadNoteColumn = Effect.fn("ensureForkThreadNoteColumn")(function* () {
-  const sql = yield* SqlClient.SqlClient;
-  const columns = yield* sql<{ readonly name: string }>`PRAGMA table_info(projection_threads)`;
-  if (columns.length > 0 && !columns.some((column) => column.name === "note")) {
-    yield* sql`ALTER TABLE projection_threads ADD COLUMN note TEXT`;
-  }
-});
 
 /** Runs pending migrations; returns the [id, name] tuples that ran. */
 export const runMigrations = Effect.fn("runMigrations")(function* ({
@@ -258,7 +247,6 @@ export const runMigrations = Effect.fn("runMigrations")(function* ({
     ...previewMigrations,
     ...(yield* run({ loader: makeMigrationLoader(toMigrationInclusive) })),
   ];
-  yield* ensureForkThreadNoteColumn();
   const migrations = executedMigrations.map(([id, name]) => `${id}_${name}`);
   yield* migrations.length === 0
     ? Effect.logDebug("Database schema is current")
