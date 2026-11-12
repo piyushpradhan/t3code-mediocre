@@ -17,6 +17,7 @@ import * as Schema from "effect/Schema";
 
 import { createBrowserPcmCapture } from "./browserPcmCapture";
 import { runEnvironmentSpeech } from "./runEnvironmentSpeech";
+import { stopSpeaking } from "./spokenReplies";
 
 const isVoiceTranscriptionError = Schema.is(VoiceTranscriptionError);
 
@@ -34,6 +35,8 @@ export function createBrowserVoiceInputPlatform(input: {
   readonly onError: (message: string) => void;
 }) {
   return createBrowserPcmCapture(input, async (options) => {
+    // The microphone must not hear a reply that is still being read aloud.
+    stopSpeaking();
     const recordingOptions = input.getTranscriptionOptions();
     const transcribeRecording = async (
       uri: string,

@@ -53,6 +53,15 @@ applies the account's safety-retention policy when choosing an endpoint. The cat
 holds no credential or consent state, which is why it may be cached while key
 presence is read fresh on every request.
 
+## Spoken replies
+
+Reading a reply aloud sends text the other way: the thread's own environment posts it
+to the speech server in its settings, which may be a third party. The
+[synthesis service](../../apps/server/src/speech/SpeechSynthesis.ts) therefore looks
+the reply up by run on the server instead of trusting client text for it, and strips
+code before anything leaves. Playback is a per-device opt-in and never falls back to
+another environment's server.
+
 ## Server side
 
 The [speech service](../../apps/server/src/speech/SpeechService.ts) runs

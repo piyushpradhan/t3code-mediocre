@@ -21,6 +21,7 @@ import {
 import { getClientSettings, subscribeClientSettings } from "../hooks/useSettings";
 import { isWindowsPlatform } from "../lib/utils";
 import { environmentSummaries } from "../state/presentation";
+import { reportSpeechFailure, speak } from "../speech/spokenReplies";
 import { environmentShell } from "../state/shell";
 import { environmentThreadShells } from "../state/threads";
 import {
@@ -139,8 +140,18 @@ export function startThreadNotifications(
         .has(threadKey({ environmentId, threadId: thread.id }))
     )
       return;
-    const { notificationMode: mode, inAppNotificationsEnabled } = getClientSettings();
+    const { notificationMode: mode, inAppNotificationsEnabled, speakReplies } = getClientSettings();
     const active = activeThread();
+    const runId = thread.latestRun?.runId;
+    if (
+      speakReplies &&
+      kind === "completion" &&
+      runId !== undefined &&
+      active.environmentId === environmentId &&
+      active.threadId === thread.id
+    ) {
+      void speak(environmentId, { threadId: thread.id, runId }).catch(reportSpeechFailure);
+    }
     const title =
       kind === "completion"
         ? "Thread completed"
@@ -356,8 +367,8 @@ export function startThreadNotifications(
   };
 
   const syncEnvironments = () => {
-    const { notificationMode, inAppNotificationsEnabled } = getClientSettings();
-    const enabled = notificationMode !== "off" || inAppNotificationsEnabled;
+    const { notificationMode, inAppNotificationsEnabled, speakReplies } = getClientSettings();
+    const enabled = notificationMode !== "off" || inAppNotificationsEnabled || speakReplies;
     if (!enabled) closeToasts(() => true);
     const environmentIds = enabled ? registry.get(environmentSummaries.environmentIdsAtom) : [];
     const activeIds = new Set(environmentIds);
@@ -384,11 +395,13 @@ export function startThreadNotifications(
 
   // Listeners that only exist for some notification modes, rebuilt when the mode changes.
   let appliedMode: ClientSettings["notificationMode"] | null = null;
+  let appliedSpeech = false;
   let stopModeListeners = () => {};
   const applyMode = () => {
-    const nextMode = getClientSettings().notificationMode;
-    if (nextMode === appliedMode) return;
+    const { notificationMode: nextMode, speakReplies } = getClientSettings();
+    if (nextMode === appliedMode && speakReplies === appliedSpeech) return;
     appliedMode = nextMode;
+    appliedSpeech = speakReplies;
     stopModeListeners();
     clearPending();
     const stops: Array<() => void> = [];
@@ -401,7 +414,7 @@ export function startThreadNotifications(
         clearPending();
       });
     }
-    if (hasNotificationSound(nextMode)) {
+    if (hasNotificationSound(nextMode) || speakReplies) {
       document.addEventListener("pointerdown", unlockNotificationAudio);
       document.addEventListener("keydown", unlockNotificationAudio);
       stops.push(() => {

@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
-import { TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { RunId, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 
 export const CloudSpeechApiKey = TrimmedNonEmptyString.check(
   Schema.isMaxLength(4096),
@@ -73,6 +73,61 @@ export class CloudSpeechError extends Schema.TaggedError<CloudSpeechError>()(
         return `The chosen model isn’t available on ${name}. Choose another model in Settings → Voice.`;
       case "unavailable":
         return `${name} couldn’t transcribe this recording. Try again later.`;
+    }
+  }
+}
+
+const synthesisField = (max: number) => Schema.String.check(Schema.isMaxLength(max));
+const synthesisFields = {
+  /** Up to and including the version segment, such as `http://localhost:8880/v1`. Empty is off. */
+  baseUrl: synthesisField(2048),
+  model: synthesisField(160),
+  voice: synthesisField(160),
+};
+/**
+ * The OpenAI-compatible `/audio/speech` server this environment sends reply text to. Any runtime
+ * that speaks that API works: a local Kokoro or Piper server, or a hosted one.
+ */
+export const SpeechSynthesisSettings = Schema.Struct(synthesisFields);
+export const SpeechSynthesisSettingsPatch = Schema.Struct({
+  baseUrl: Schema.optionalKey(synthesisFields.baseUrl),
+  model: Schema.optionalKey(synthesisFields.model),
+  voice: Schema.optionalKey(synthesisFields.voice),
+});
+export type SpeechSynthesisSettings = typeof SpeechSynthesisSettings.Type;
+export const SPEECH_SYNTHESIS_MAX_CHARS = 1_200;
+
+export const EnvironmentSpeechSynthesisRequest = Schema.Union([
+  /** The last thing the assistant said in this run. */
+  Schema.Struct({ threadId: ThreadId, runId: RunId }),
+  Schema.Struct({ text: Schema.String.check(Schema.isMaxLength(SPEECH_SYNTHESIS_MAX_CHARS)) }),
+]);
+
+export class SpeechSynthesisError extends Schema.TaggedError<SpeechSynthesisError>()(
+  "SpeechSynthesisError",
+  {
+    reason: Schema.Literals([
+      "not-configured",
+      "nothing-to-say",
+      "unreadable-key",
+      "rejected-key",
+      "unavailable",
+    ]),
+  },
+  { httpApiStatus: 422 },
+) {
+  override get message() {
+    switch (this.reason) {
+      case "not-configured":
+        return "Set a speech server in Settings → Voice → Spoken replies.";
+      case "nothing-to-say":
+        return "This reply has no text to read aloud.";
+      case "unreadable-key":
+        return "Couldn’t read the speech server’s API key. Unlock the vault on the environment or update the key in Settings → Voice.";
+      case "rejected-key":
+        return "The speech server rejected the API key. Check it in Settings → Voice.";
+      case "unavailable":
+        return "The speech server couldn’t produce audio. Check its URL, model, and voice in Settings → Voice.";
     }
   }
 }

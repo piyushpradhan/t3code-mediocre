@@ -6,6 +6,7 @@ import {
   decodeSpeechPcmRequest,
   encodeSpeechPcmRequest,
   resolveSpeechVocabulary,
+  speakableText,
 } from "./speech.ts";
 
 describe("speech PCM request framing", () => {
@@ -148,5 +149,30 @@ describe("chooseSetupSpeechModel", () => {
   ] as const)("%s", (_, selectedModelId, intent, preferred, expected) => {
     const choice = chooseSetupSpeechModel(catalog, { selectedModelId, intent, preferred });
     expect(choice && { id: choice.model.id, language: choice.language }).toEqual(expected);
+  });
+});
+
+describe("speakableText", () => {
+  it("keeps the prose of a markdown reply and drops what cannot be spoken", () => {
+    const reply = [
+      "## Done",
+      "Fixed the **token check** in `auth.ts`; see [the docs](https://example.com/a).",
+      "```ts",
+      "const expired = now <= expiry;",
+      "```",
+      "| file | lines |",
+      "| --- | --- |",
+      "- Tests pass.",
+    ].join("\n");
+    expect(speakableText(reply)).toBe(
+      "Done Fixed the token check in auth.ts; see the docs. Tests pass.",
+    );
+  });
+
+  it("ends a long reply at the last sentence that fits", () => {
+    expect(speakableText("One fits. Two fits too. Three does not fit.", 30)).toBe(
+      "One fits. Two fits too.",
+    );
+    expect(speakableText("no sentence boundary anywhere here", 12)).toBe("no sentence");
   });
 });

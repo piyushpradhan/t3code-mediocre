@@ -78,6 +78,8 @@ import {
 import { useTextGenerationTargets } from "../../textGenerators";
 import { useEnvironmentProviders, useEnvironments } from "../../state/environments";
 import { useEnvironmentScope } from "../../state/session";
+import { reportSpeechFailure, speak, stopSpeaking } from "../../speech/spokenReplies";
+import { unlockNotificationAudio } from "../../threadNotifications";
 import { EMPTY_SERVER_PROVIDERS } from "../../state/server";
 import {
   useEnvironmentSpeechInput,
@@ -92,6 +94,7 @@ import { VoiceInputSetup } from "../chat/VoiceInputSetup";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { Button } from "../ui/button";
+import { DraftInput } from "../ui/draft-input";
 import { Input } from "../ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "../ui/input-group";
 import {
@@ -133,6 +136,7 @@ import {
   SettingsSearchTarget,
   SettingsSection,
 } from "./settingsLayout";
+import { SecretInput } from "./SecretInput";
 import { searchableSetting } from "./settingsSearch";
 import { useOptionalSettingsScope, useSettingsScope } from "./SettingsScopeContext";
 import { useScopedModelDisabledReason } from "./useScopedModelAvailability";
@@ -492,6 +496,104 @@ function ProjectDictionaryRow() {
         />
       </div>
     </SettingsRow>
+  );
+}
+
+/** A thread's own environment reads its reply, so the speech server is an environment setting. */
+function SpokenRepliesSection() {
+  const scope = useOptionalSettingsScope();
+  const enabled = useClientSettings((settings) => settings.speakReplies);
+  const server = useScopedSettings((settings) => settings.speechSynthesis);
+  const keySaved = useScopedSettings(
+    (settings) => settings.cloudSpeechCredentials.synthesis !== "",
+  );
+  const updateSettings = useUpdateScopedSettings();
+  const environmentId = scope?.environment?.environmentId;
+  return (
+    <SettingsSection id="voice-spoken-replies" title="Spoken replies">
+      <SettingsRow
+        {...searchableSetting("speak-replies")}
+        title="Read replies aloud"
+        description="When the thread you have open finishes, this device plays its reply. Code, tables, and links are skipped."
+        control={
+          <Switch
+            aria-label="Read replies aloud"
+            checked={enabled}
+            onCheckedChange={(checked) => {
+              if (!checked) stopSpeaking();
+              void updateClientSettings({ speakReplies: checked });
+            }}
+          />
+        }
+      />
+      {scope === null ? null : (
+        <SettingsRow
+          serverScoped
+          settingKeys={["speechSynthesis", "cloudSpeechCredentials"]}
+          {...searchableSetting("speech-synthesis-server")}
+          title="Speech server"
+          description="Any server with an OpenAI-compatible speech API, such as a local Kokoro or Piper server. The environment sends reply text to it."
+          control={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={environmentId === undefined || server.baseUrl === ""}
+              onClick={() => {
+                if (environmentId === undefined) return;
+                unlockNotificationAudio();
+                void speak(environmentId, { text: "This is how replies will sound." }).catch(
+                  reportSpeechFailure,
+                );
+              }}
+            >
+              Test voice
+            </Button>
+          }
+        >
+          <div className="mt-3 grid gap-2 pb-2">
+            <DraftInput
+              aria-label="Speech server URL"
+              placeholder="http://localhost:8880/v1"
+              value={server.baseUrl}
+              onCommit={(next) => updateSettings({ speechSynthesis: { baseUrl: next.trim() } })}
+            />
+            <DraftInput
+              aria-label="Speech model"
+              placeholder="Model, such as kokoro"
+              value={server.model}
+              onCommit={(next) => updateSettings({ speechSynthesis: { model: next.trim() } })}
+            />
+            <DraftInput
+              aria-label="Voice"
+              placeholder="Voice, such as af_heart"
+              value={server.voice}
+              onCommit={(next) => updateSettings({ speechSynthesis: { voice: next.trim() } })}
+            />
+            <div className="flex gap-2">
+              <SecretInput
+                aria-label="Speech server API key"
+                placeholder="API key, if the server needs one"
+                configured={keySaved}
+                value=""
+                onCommit={(next) =>
+                  updateSettings({ cloudSpeechCredentials: { synthesis: next.trim() } })
+                }
+              />
+              {keySaved ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => updateSettings({ cloudSpeechCredentials: { synthesis: "" } })}
+                >
+                  Remove key
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </SettingsRow>
+      )}
+    </SettingsSection>
   );
 }
 
@@ -1691,6 +1793,8 @@ export function VoiceSettingsPanel() {
           />
         ) : null}
       </SettingsSection>
+
+      <SpokenRepliesSection />
     </SettingsPageContainer>
   );
 }
