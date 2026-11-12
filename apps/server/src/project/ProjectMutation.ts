@@ -4,7 +4,10 @@ import * as Effect from "effect/Effect";
 import { type ProjectCloneTracker } from "./ProjectCloneTracker.ts";
 import { type ProjectService } from "./ProjectService.ts";
 
-type ProjectMutations = Pick<ProjectService["Service"], "create" | "delete" | "update">;
+type ProjectMutations = Pick<
+  ProjectService["Service"],
+  "create" | "createProduct" | "delete" | "update"
+>;
 
 export const projectMutationOperation = Effect.fn("projectMutationOperation")(function* (
   projects: ProjectMutations,
@@ -36,6 +39,9 @@ export const projectMutationOperation = Effect.fn("projectMutationOperation")(fu
           ? {}
           : { defaultModelSelection: mutation.defaultModelSelection }),
         ...(mutation.autoPull === undefined ? {} : { autoPull: mutation.autoPull }),
+        ...(mutation.productProjectIds === undefined
+          ? {}
+          : { productProjectIds: mutation.productProjectIds }),
         ...(mutation.projectIcon === undefined ? {} : { projectIcon: mutation.projectIcon }),
         ...(mutation.faviconPath === undefined ? {} : { faviconPath: mutation.faviconPath }),
         ...(mutation.defaultThreadEnvMode === undefined
@@ -44,6 +50,14 @@ export const projectMutationOperation = Effect.fn("projectMutationOperation")(fu
         ...(mutation.scripts === undefined ? {} : { scripts: mutation.scripts }),
         ...(mutation.pinned === undefined ? {} : { pinned: mutation.pinned }),
         ...(mutation.archived === undefined ? {} : { archived: mutation.archived }),
+      });
+
+    case "product.create":
+      return yield* projects.createProduct({
+        commandId: mutation.commandId,
+        projectId: mutation.projectId,
+        title: mutation.title,
+        productProjectIds: mutation.productProjectIds,
       });
 
     case "project.delete":

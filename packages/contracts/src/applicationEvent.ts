@@ -42,6 +42,7 @@ export const ApplicationProjectCreatedPayload = Schema.Struct({
   defaultThreadEnvMode: Schema.optional(Schema.NullOr(ThreadEnvMode)),
   faviconPath: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   projectIcon: Schema.optional(Schema.NullOr(StoredProjectIcon)),
+  productProjectIds: Schema.optional(Schema.Array(ProjectId)),
   scripts: Schema.Array(ProjectScript),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
@@ -57,6 +58,7 @@ export const ApplicationProjectMetaUpdatedPayload = Schema.Struct({
   // Absent = leave unchanged; null = clear the override.
   defaultThreadEnvMode: Schema.optional(Schema.NullOr(ThreadEnvMode)),
   autoPull: Schema.optional(Schema.Boolean),
+  productProjectIds: Schema.optional(Schema.Array(ProjectId)),
   faviconPath: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   projectIcon: Schema.optional(Schema.NullOr(StoredProjectIcon)),
   scripts: Schema.optional(Schema.Array(ProjectScript)),

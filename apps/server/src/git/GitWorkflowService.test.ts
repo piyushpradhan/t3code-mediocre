@@ -5,6 +5,7 @@ import * as Layer from "effect/Layer";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 
 import * as ServerConfig from "../config.ts";
 import * as VcsProcess from "../vcs/VcsProcess.ts";
@@ -12,6 +13,23 @@ import * as GitManager from "./GitManager.ts";
 import * as GitWorkflowService from "./GitWorkflowService.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as VcsDriverRegistry from "../vcs/VcsDriverRegistry.ts";
+
+const layerWorkflow = GitWorkflowService.layer.pipe(
+  Layer.provide(
+    Layer.mock(VcsDriverRegistry.VcsDriverRegistry)({
+      resolve: () => Effect.succeed({ kind: "git" } as VcsDriverRegistry.VcsDriverHandle),
+    }),
+  ),
+  Layer.provide(Layer.mock(GitManager.GitManager)({})),
+  Layer.provideMerge(GitVcsDriver.layer),
+  Layer.provideMerge(VcsProcess.layer),
+  Layer.provideMerge(
+    ServerConfig.layerTest(process.cwd(), { prefix: "t3-ref-named-" }).pipe(
+      Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
+    ),
+  ),
+  Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
+);
 
 it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("GitWorkflowService", (it) => {
   it.effect("finds a name among the refs of every namespace", () =>
@@ -34,26 +52,44 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("GitWorkflowServi
         (refName) => workflow.hasRefNamed({ cwd, refName }),
       );
       assert.deepEqual(found, [true, true, true, true, false, false]);
-    }).pipe(
-      Effect.scoped,
-      Effect.provide(
-        GitWorkflowService.layer.pipe(
-          Layer.provide(
-            Layer.mock(VcsDriverRegistry.VcsDriverRegistry)({
-              resolve: () => Effect.succeed({ kind: "git" } as VcsDriverRegistry.VcsDriverHandle),
-            }),
-          ),
-          Layer.provide(Layer.mock(GitManager.GitManager)({})),
-          Layer.provideMerge(GitVcsDriver.layer),
-          Layer.provideMerge(VcsProcess.layer),
-          Layer.provideMerge(
-            ServerConfig.layerTest(process.cwd(), { prefix: "t3-ref-named-" }).pipe(
-              Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
-            ),
-          ),
-          Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
-        ),
-      ),
-    ),
+    }).pipe(Effect.scoped, Effect.provide(layerWorkflow)),
+  );
+  it.effect("removes a product folder's member worktrees and links, not the linked folders", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-product-wt-" });
+      const workflow = yield* GitWorkflowService.GitWorkflowService;
+      const driver = yield* GitVcsDriver.GitVcsDriver;
+      const lib = path.join(root, "lib");
+      const docs = path.join(root, "docs");
+      const folder = path.join(root, "worktrees", "acme", "feature-0123456789abcdef");
+      yield* fileSystem.makeDirectory(lib);
+      yield* fileSystem.makeDirectory(docs);
+      yield* fileSystem.makeDirectory(folder, { recursive: true });
+      for (const args of [
+        ["init", "-b", "main"],
+        ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "--allow-empty", "-m", "init"],
+        ["worktree", "add", "-b", "feature", path.join(folder, "lib")],
+      ]) {
+        yield* driver.execute({ operation: "test.setupRepo", cwd: lib, args });
+      }
+      yield* fileSystem.symlink(docs, path.join(folder, "docs"));
+
+      yield* workflow.removeWorktree({
+        cwd: path.join(root, "products", "acme"),
+        path: folder,
+        force: true,
+      });
+
+      assert.isFalse(yield* fileSystem.exists(folder));
+      assert.isTrue(yield* fileSystem.exists(docs));
+      const worktrees = yield* driver.execute({
+        operation: "test.listWorktrees",
+        cwd: lib,
+        args: ["worktree", "list", "--porcelain"],
+      });
+      assert.notInclude(worktrees.stdout, "feature-0123456789abcdef");
+    }).pipe(Effect.scoped, Effect.provide(layerWorkflow)),
   );
 });

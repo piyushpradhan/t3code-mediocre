@@ -1,3 +1,4 @@
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import {
   type ManagedPolicySummary,
@@ -11,7 +12,9 @@ import {
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Path from "effect/Path";
 import * as Stream from "effect/Stream";
 
 import type { ProviderInstance } from "@t3tools/provider-core/server/driver";
@@ -22,6 +25,7 @@ import * as ProjectStore from "./ProjectStore.ts";
 import * as RuntimePolicy from "./RuntimePolicy.ts";
 
 const projectId = ProjectId.make("project:runtime-policy");
+const memberProjectId = ProjectId.make("project:runtime-policy-member");
 const providerInstanceId = ProviderInstanceId.make("codex");
 const modelSelection = {
   instanceId: providerInstanceId,
@@ -78,7 +82,10 @@ const providerInstanceFor = (instanceId: ProviderInstanceId) =>
     },
   }) as ProviderInstance;
 
-const layerWithPolicy = (policy?: ManagedPolicySummary) =>
+const layerWithPolicy = (
+  policy?: ManagedPolicySummary,
+  product?: { readonly folder: string; readonly memberRoot: string },
+) =>
   RuntimePolicy.layerFromProjectStore.pipe(
     Layer.provide(ServerSettings.layerTest({}, policy)),
     Layer.provide(
@@ -93,27 +100,78 @@ const layerWithPolicy = (policy?: ManagedPolicySummary) =>
     Layer.provide(
       Layer.mock(ProjectStore.ProjectStoreV2)({
         get: () =>
-          Effect.succeedSome({
-            projectId,
-            title: "Project",
-            workspaceRoot: "/project-root",
-            defaultModelSelection: null,
-            defaultThreadEnvMode: null,
-            autoPull: false,
-            faviconPath: null,
-            projectIcon: null,
-            scripts: [],
-            pinnedAt: null,
-            archivedAt: null,
-            createdAt: "2026-06-21T00:00:00.000Z",
-            updatedAt: "2026-06-21T00:00:00.000Z",
-            deletedAt: null,
-          }),
+          Effect.succeedSome(
+            product === undefined
+              ? projectRow({})
+              : projectRow({ workspaceRoot: product.folder, productProjectIds: [memberProjectId] }),
+          ),
+        list: () =>
+          Effect.succeed(
+            product === undefined
+              ? []
+              : [projectRow({ projectId: memberProjectId, workspaceRoot: product.memberRoot })],
+          ),
       }),
     ),
+    Layer.provide(NodeServices.layer),
   );
 
+const projectRow = (overrides: Partial<ProjectStore.ProjectRow>): ProjectStore.ProjectRow => ({
+  projectId,
+  title: "Project",
+  workspaceRoot: "/project-root",
+  defaultModelSelection: null,
+  defaultThreadEnvMode: null,
+  autoPull: false,
+  productProjectIds: null,
+  faviconPath: null,
+  projectIcon: null,
+  scripts: [],
+  pinnedAt: null,
+  archivedAt: null,
+  createdAt: "2026-06-21T00:00:00.000Z",
+  updatedAt: "2026-06-21T00:00:00.000Z",
+  deletedAt: null,
+  ...overrides,
+});
+
 const layerTest = layerWithPolicy();
+
+it.layer(NodeServices.layer)("RuntimePolicyV2 products", (it) => {
+  it.effect("gives providers the real folders of members the product folder links to", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fileSystem.makeTempDirectoryScoped();
+      const folder = path.join(root, "products", "acme");
+      const memberRoot = path.join(root, "checkouts", "shared-lib");
+      const threadFolder = path.join(root, "worktrees", "acme", "feature-0123456789abcdef");
+      yield* fileSystem.makeDirectory(folder, { recursive: true });
+      yield* fileSystem.makeDirectory(memberRoot, { recursive: true });
+      const resolve = (worktreePath: string | null) =>
+        Effect.gen(function* () {
+          const policy = yield* RuntimePolicy.RuntimePolicyV2;
+          const now = yield* DateTime.now;
+          return yield* policy.resolve({
+            thread: makeThread({ now, worktreePath }),
+            modelSelection,
+          });
+        }).pipe(Effect.provide(layerWithPolicy(undefined, { folder, memberRoot })));
+
+      // Turn start has not linked the member yet; its folder is still reachable.
+      assert.deepEqual((yield* resolve(null)).additionalDirectories, [memberRoot]);
+      yield* fileSystem.symlink(memberRoot, path.join(folder, "shared-lib"));
+      const local = yield* resolve(null);
+      assert.equal(local.cwd, folder);
+      assert.deepEqual(local.additionalDirectories, [memberRoot]);
+      // A member worktree is a real folder inside the thread's folder, so the sandbox covers it.
+      yield* fileSystem.makeDirectory(path.join(threadFolder, "shared-lib"), { recursive: true });
+      const worktree = yield* resolve(threadFolder);
+      assert.equal(worktree.cwd, threadFolder);
+      assert.isUndefined(worktree.additionalDirectories);
+    }),
+  );
+});
 
 it.layer(layerTest)("RuntimePolicyV2", (it) => {
   it.effect("asks for Antigravity command approval when a stored Auto thread falls back", () =>

@@ -10,12 +10,15 @@ import {
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 
 import * as ProviderInstanceRegistry from "../provider/ProviderInstanceRegistry.ts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import { productLinkedDirectories } from "../project/productWorkspaces.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as ProjectStore from "./ProjectStore.ts";
 
@@ -143,10 +146,14 @@ export const layerFromProjectStore: Layer.Layer<
   | ProjectStore.ProjectStoreV2
   | ProviderInstanceRegistry.ProviderInstanceRegistry
   | ServerSettings.ServerSettingsService
+  | FileSystem.FileSystem
+  | Path.Path
 > = Layer.effect(
   RuntimePolicyV2,
   Effect.gen(function* () {
     const projects = yield* ProjectStore.ProjectStoreV2;
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
     const providerInstances = yield* ProviderInstanceRegistry.ProviderInstanceRegistry;
     // The same ceiling the orchestrator enforces, fixed for the server's life.
     const { managedPolicy } = yield* ServerSettings.ServerSettingsService;
@@ -159,35 +166,36 @@ export const layerFromProjectStore: Layer.Layer<
           instance === undefined
             ? undefined
             : (yield* instance.snapshot.getSnapshot).supportedRuntimeModes;
-        const cwd =
-          input.thread.worktreePath ??
-          (yield* projects.get(input.thread.projectId).pipe(
-            Effect.mapError(
-              (cause) =>
-                new RuntimePolicyResolveError({
-                  projectId: input.thread.projectId,
-                  providerInstanceId: input.modelSelection.instanceId,
-                  cause,
-                }),
-            ),
-            Effect.flatMap(
-              Option.match({
-                onNone: () =>
-                  Effect.fail(
-                    new RuntimePolicyResolveError({
-                      projectId: input.thread.projectId,
-                      providerInstanceId: input.modelSelection.instanceId,
-                      cause: "Project not found.",
-                    }),
-                  ),
-                onSome: (project) => Effect.succeed(project.workspaceRoot),
-              }),
-            ),
-          ));
+        const resolveError = (cause: unknown) =>
+          new RuntimePolicyResolveError({
+            projectId: input.thread.projectId,
+            providerInstanceId: input.modelSelection.instanceId,
+            cause,
+          });
+        const { worktreePath } = input.thread;
+        const project = Option.getOrUndefined(
+          yield* projects.get(input.thread.projectId).pipe(Effect.mapError(resolveError)),
+        );
+        const cwd = worktreePath ?? project?.workspaceRoot;
+        if (cwd === undefined) return yield* resolveError("Project not found.");
+        const members =
+          project?.productProjectIds == null
+            ? []
+            : yield* projects
+                .list({ projectIds: project.productProjectIds })
+                .pipe(Effect.mapError(resolveError));
+        const additionalDirectories = yield* productLinkedDirectories(
+          cwd,
+          members.map((member) => member.workspaceRoot),
+        ).pipe(
+          Effect.provideService(FileSystem.FileSystem, fileSystem),
+          Effect.provideService(Path.Path, path),
+        );
         return ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
           runtimeMode: providerRuntimeMode(input.thread.runtimeMode, supportedRuntimeModes),
           interactionMode: input.thread.interactionMode,
           cwd,
+          ...(additionalDirectories.length === 0 ? {} : { additionalDirectories }),
           ...(maxRuntimeMode === undefined ? {} : { maxRuntimeMode }),
         });
       }),

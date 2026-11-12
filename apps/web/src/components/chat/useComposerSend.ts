@@ -335,6 +335,8 @@ export function useComposerSend(input: ComposerSendInput) {
     persistThreadSettingsForNextTurn,
     linkCheckoutPullRequest,
   } = input;
+  // A product folder has no branches; each member worktree starts from its own checkout.
+  const productWorktreeBase = activeProject?.productProjectIds != null ? "HEAD" : null;
   const linkedEnvironments = useLinkedEnvironments(environmentId);
   const handleNewThread = useNewThreadHandler();
   const navigate = useNavigate();
@@ -785,7 +787,7 @@ export function useComposerSend(input: ComposerSendInput) {
       activeMessageCount,
       sendEnvMode,
       worktreePath: activeThread.worktreePath,
-      activeThreadBranch,
+      activeThreadBranch: activeThreadBranch ?? productWorktreeBase,
       resumeCompactionTokens,
       keepFullHistory,
       phase,
@@ -1100,7 +1102,7 @@ export function useComposerSend(input: ComposerSendInput) {
       await sendToMultipleModels({
         threadId: threadIdForSend,
         project: activeProject,
-        branch: activeThreadBranch!,
+        branch: (activeThreadBranch ?? productWorktreeBase)!,
         selections: multipleModelSelections,
         targets: multipleTargets,
         sendSnapshot,

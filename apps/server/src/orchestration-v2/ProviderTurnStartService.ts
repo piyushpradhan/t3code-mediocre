@@ -12,6 +12,7 @@ import {
   type OrchestrationV2TurnItem,
   isCompactionCommandMessage,
   parseGoalCommand,
+  type ProjectId,
   RunId,
   ThreadId,
 } from "@t3tools/contracts";
@@ -36,6 +37,8 @@ import * as ProjectService from "../project/ProjectService.ts";
 import * as ProviderAuthService from "../provider/ProviderAuthService.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { makeIsManagedWorktreePath } from "../worktreesDirectory.ts";
+import { productMemberFolderName } from "../project/productWorkspaces.ts";
+import { isTemporaryWorktreeBranch } from "@t3tools/shared/git";
 import * as EventSink from "./EventSink.ts";
 import * as ProviderUsageAnalytics from "../telemetry/ProviderUsageAnalytics.ts";
 import * as ContextHandoffService from "./ContextHandoffService.ts";
@@ -247,6 +250,68 @@ export const layer: Layer.Layer<
           ...(base.baseRefName === undefined ? {} : { baseRefName: base.baseRefName }),
           path: worktreePath,
         });
+      },
+    );
+
+    // A product's folder holds one entry per member: a worktree on the thread's branch for Git
+    // members of a worktree thread, otherwise a link to the member's own folder.
+    const materializeProductFolder = Effect.fn("ProviderTurnStartService.materializeProductFolder")(
+      function* (input: {
+        readonly productProjectIds: ReadonlyArray<ProjectId>;
+        readonly folder: string;
+        readonly branch: string | null;
+      }) {
+        yield* fileSystem.makeDirectory(input.folder, { recursive: true });
+        for (const memberId of input.productProjectIds) {
+          const member = Option.getOrUndefined(yield* projects.getById(memberId));
+          if (member === undefined) continue;
+          const entry = path.join(
+            input.folder,
+            productMemberFolderName(path, member.workspaceRoot),
+          );
+          const isLink = yield* fileSystem.readLink(entry).pipe(
+            Effect.as(true),
+            Effect.orElseSucceed(() => false),
+          );
+          if (yield* fileSystem.exists(entry)) {
+            if (isLink || input.branch === null) continue;
+            // The thread's temporary branch is renamed after its first message, often after this ran.
+            const { refName } = yield* gitWorkflow.localStatus({ cwd: entry });
+            if (
+              refName !== null &&
+              refName !== input.branch &&
+              isTemporaryWorktreeBranch(refName) &&
+              !isTemporaryWorktreeBranch(input.branch)
+            ) {
+              yield* gitWorkflow.renameBranch({
+                cwd: entry,
+                oldBranch: refName,
+                newBranch: input.branch,
+              });
+            }
+            continue;
+          }
+          // A link whose member folder moved; replace it.
+          if (isLink) yield* fileSystem.remove(entry);
+          const isGitMember = yield* fileSystem.exists(path.join(member.workspaceRoot, ".git"));
+          if (input.branch !== null && isGitMember) {
+            const branch = input.branch;
+            yield* recreateMissingWorktree({
+              cwd: member.workspaceRoot,
+              worktreePath: entry,
+              branch,
+            }).pipe(
+              Effect.mapError((cause) =>
+                cause._tag === "WorktreeRecreateNoBaseError"
+                  ? cause
+                  : new WorktreeRecreateError({ worktreePath: entry, branch, cause }),
+              ),
+            );
+          } else {
+            // ponytail: Windows needs Developer Mode for directory links; use junctions if that bites.
+            yield* fileSystem.symlink(member.workspaceRoot, entry);
+          }
+        }
       },
     );
 
@@ -650,45 +715,72 @@ export const layer: Layer.Layer<
         }
       }
       const { worktreePath, branch } = projection.thread;
-      if (worktreePath !== null && branch !== null) {
+      const threadProject = yield* projects.getById(projection.thread.projectId).pipe(
+        Effect.map(Option.getOrUndefined),
+        Effect.orElseSucceed(() => undefined),
+      );
+      const productProjectIds = threadProject?.productProjectIds ?? null;
+      if (worktreePath !== null && branch !== null && productProjectIds === null) {
         const exists = yield* fileSystem
           .exists(worktreePath)
           .pipe(Effect.orElseSucceed(() => true));
-        if (!exists && (yield* isManagedWorktreePath(worktreePath))) {
-          const project = yield* projects.getById(projection.thread.projectId).pipe(
-            Effect.map(Option.getOrUndefined),
-            Effect.orElseSucceed(() => undefined),
-          );
-          if (project !== undefined) {
-            yield* Effect.logWarning("provider turn start recreating missing worktree", {
-              threadId: projection.thread.id,
+        if (
+          !exists &&
+          threadProject !== undefined &&
+          (yield* isManagedWorktreePath(worktreePath))
+        ) {
+          yield* Effect.logWarning("provider turn start recreating missing worktree", {
+            threadId: projection.thread.id,
+            worktreePath,
+            branch,
+          });
+          const recreateResult = yield* Effect.result(
+            recreateMissingWorktree({
+              cwd: threadProject.workspaceRoot,
               worktreePath,
               branch,
-            });
-            const recreateResult = yield* Effect.result(
-              recreateMissingWorktree({
-                cwd: project.workspaceRoot,
-                worktreePath,
-                branch,
-              }).pipe(
-                Effect.mapError((cause) =>
-                  cause._tag === "WorktreeRecreateNoBaseError"
-                    ? cause
-                    : new WorktreeRecreateError({ worktreePath, branch, cause }),
-                ),
+            }).pipe(
+              Effect.mapError((cause) =>
+                cause._tag === "WorktreeRecreateNoBaseError"
+                  ? cause
+                  : new WorktreeRecreateError({ worktreePath, branch, cause }),
               ),
-            );
-            if (recreateResult._tag === "Failure") {
-              if (input.willRetry === true) return yield* recreateResult.failure;
-              yield* settleStartFailure({
-                signal: "worktree-recreate-failure",
-                title: "Couldn't recreate thread workspace",
-                error: recreateResult.failure,
-                message: recreateResult.failure.message,
-              });
-              return;
-            }
+            ),
+          );
+          if (recreateResult._tag === "Failure") {
+            if (input.willRetry === true) return yield* recreateResult.failure;
+            yield* settleStartFailure({
+              signal: "worktree-recreate-failure",
+              title: "Couldn't recreate thread workspace",
+              error: recreateResult.failure,
+              message: recreateResult.failure.message,
+            });
+            return;
           }
+        }
+      }
+      if (
+        threadProject !== undefined &&
+        productProjectIds !== null &&
+        (worktreePath === null || (yield* isManagedWorktreePath(worktreePath)))
+      ) {
+        const productResult = yield* Effect.result(
+          materializeProductFolder({
+            productProjectIds,
+            folder: worktreePath ?? threadProject.workspaceRoot,
+            branch: worktreePath === null ? null : branch,
+          }),
+        );
+        if (productResult._tag === "Failure") {
+          const failure = productResult.failure;
+          if (input.willRetry === true) return yield* failure;
+          yield* settleStartFailure({
+            signal: "product-folder-failure",
+            title: "Couldn't prepare the product folder",
+            error: failure,
+            message: failure.message,
+          });
+          return;
         }
       }
       const selectInheritedBackgroundItems = (

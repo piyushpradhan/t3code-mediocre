@@ -15,6 +15,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
@@ -32,6 +33,7 @@ import {
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import * as ThreadCommandExecutor from "../orchestration-v2/ThreadCommandExecutor.ts";
 import { planThreadDeletion } from "../orchestration-v2/ThreadDeletion.ts";
+import * as ServerConfig from "../config.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { makeIsManagedWorktreePath } from "../worktreesDirectory.ts";
 import * as ProjectEnrichmentService from "./ProjectEnrichmentService.ts";
@@ -40,6 +42,14 @@ import * as WorkspacePaths from "../workspace/WorkspacePaths.ts";
 export interface ProjectCreateInput extends ProjectCreatePayload {
   readonly commandId: CommandId;
   readonly projectId: ProjectId;
+  readonly productProjectIds?: ReadonlyArray<ProjectId>;
+}
+
+export interface ProductCreateInput {
+  readonly commandId: CommandId;
+  readonly projectId: ProjectId;
+  readonly title: string;
+  readonly productProjectIds: ReadonlyArray<ProjectId>;
 }
 
 export interface ProjectUpdateInput extends ProjectUpdatePayload {
@@ -128,6 +138,10 @@ export class ProjectService extends Context.Service<
   ProjectService,
   {
     readonly create: (input: ProjectCreateInput) => Effect.Effect<Project, ProjectServiceError>;
+    /** A product gets its own folder, where its threads see every member project. */
+    readonly createProduct: (
+      input: ProductCreateInput,
+    ) => Effect.Effect<Project, ProjectServiceError>;
     readonly bootstrap: (
       input: ProjectBootstrapInput,
     ) => Effect.Effect<
@@ -181,6 +195,8 @@ export const make = Effect.gen(function* () {
   const threadCommands = yield* ThreadCommandExecutor.ThreadCommandExecutor;
   const serverSettings = yield* ServerSettings.ServerSettingsService;
   const fileSystem = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const { baseDir } = yield* ServerConfig.ServerConfig;
   const isManagedWorktreePath = yield* makeIsManagedWorktreePath;
   const projectLocks = yield* KeyedLock.make<ProjectId>();
   const workspaceLocks = yield* KeyedLock.make<string>();
@@ -197,6 +213,7 @@ export const make = Effect.gen(function* () {
     defaultModelSelection: row.defaultModelSelection,
     defaultThreadEnvMode: row.defaultThreadEnvMode,
     autoPull: row.autoPull,
+    productProjectIds: row.productProjectIds,
     projectIcon: row.projectIcon,
     scripts: row.scripts,
     pinnedAt: row.pinnedAt,
@@ -390,11 +407,60 @@ export const make = Effect.gen(function* () {
         title: input.title,
         workspaceRoot,
         ...(input.scripts === undefined ? {} : { scripts: input.scripts }),
+        ...(input.productProjectIds === undefined
+          ? {}
+          : { productProjectIds: input.productProjectIds }),
       });
       yield* projectEnrichment.invalidate([workspaceRoot]);
       return yield* readCommitted(input.projectId);
     },
   );
+
+  const productMembers = Effect.fn("ProjectService.productMembers")(function* (
+    projectId: ProjectId,
+    requested: ReadonlyArray<ProjectId>,
+  ) {
+    const members = [...new Set(requested)].filter((id) => id !== projectId);
+    if (members.length === 0) {
+      return yield* new ProjectInvalidError({
+        projectId,
+        detail: "A product needs at least one other project.",
+      });
+    }
+    for (const memberId of members) {
+      const member = yield* readRow(memberId);
+      if (Option.isNone(member)) return yield* new ProjectNotFoundError({ projectId: memberId });
+      if (member.value.productProjectIds !== null) {
+        return yield* new ProjectInvalidError({
+          projectId,
+          detail: `"${member.value.title}" is a product; a product can only contain projects.`,
+        });
+      }
+    }
+    return members;
+  });
+
+  const createProduct: ProjectService["Service"]["createProduct"] = Effect.fn(
+    "ProjectService.createProduct",
+  )(function* (input) {
+    const productProjectIds = yield* productMembers(input.projectId, input.productProjectIds);
+    const slug =
+      input.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 40) || "product";
+    // The project id keeps the folder unique and the same when a create is retried.
+    const workspaceRoot = path.join(baseDir, "products", `${slug}-${input.projectId.slice(0, 8)}`);
+    return yield* create({
+      commandId: input.commandId,
+      projectId: input.projectId,
+      title: input.title,
+      workspaceRoot,
+      createWorkspaceRootIfMissing: true,
+      productProjectIds,
+    });
+  });
 
   const update: ProjectService["Service"]["update"] = Effect.fn("ProjectService.update")(
     function* (input) {
@@ -403,6 +469,16 @@ export const make = Effect.gen(function* () {
         return yield* new ProjectNotFoundError({ projectId: input.projectId });
       }
       const previousRoot = existing.value.workspaceRoot;
+      if (input.productProjectIds !== undefined && existing.value.productProjectIds === null) {
+        return yield* new ProjectInvalidError({
+          projectId: input.projectId,
+          detail: "Only a product has member projects. Create a product instead.",
+        });
+      }
+      const productProjectIds =
+        input.productProjectIds === undefined
+          ? undefined
+          : yield* productMembers(input.projectId, input.productProjectIds);
       const workspaceRoot =
         input.workspaceRoot === undefined
           ? previousRoot
@@ -420,6 +496,7 @@ export const make = Effect.gen(function* () {
           ? {}
           : { defaultModelSelection: input.defaultModelSelection }),
         ...(input.autoPull === undefined ? {} : { autoPull: input.autoPull }),
+        ...(productProjectIds === undefined ? {} : { productProjectIds }),
         ...(input.projectIcon === undefined ? {} : { projectIcon: input.projectIcon }),
         ...(input.faviconPath === undefined ? {} : { faviconPath: input.faviconPath }),
         ...(input.defaultThreadEnvMode === undefined
@@ -631,6 +708,7 @@ export const make = Effect.gen(function* () {
 
   return ProjectService.of({
     create,
+    createProduct,
     bootstrap,
     update,
     delete: deleteProject,

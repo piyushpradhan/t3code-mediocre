@@ -63,6 +63,8 @@ interface ThreadDetailsPanelProps extends Pick<
   gitCwd: string | null;
   workspaceMutationId: string | null;
   isGitRepo: boolean;
+  /** A product folder is not a repository and should not be offered one. */
+  isProduct?: boolean;
   envLocked: boolean;
   availableEnvironments: readonly EnvironmentOption[];
   autoEnvironmentLabel?: string | undefined;
@@ -97,6 +99,7 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
   const activeThreadRef = { environmentId: props.environmentId, threadId: props.threadId };
   const branchToolbarProps = {
     showGitControls: props.isGitRepo,
+    isProduct: props.isProduct ?? false,
     environmentId: props.environmentId,
     threadId: props.threadId,
     projectId: props.projectId,
@@ -157,6 +160,7 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
           branch: props.gitCwd !== null && props.isGitRepo && visible.branch,
           git:
             props.gitCwd !== null &&
+            props.isProduct !== true &&
             props.activeProjectName !== undefined &&
             (visible.gitActions || (visible.changes && props.isGitRepo)),
         };

@@ -31,6 +31,7 @@ describe("mutateProjectWithClone", () => {
       const result = yield* mutateProjectWithClone(
         {
           create: () => Effect.die("unused"),
+          createProduct: () => Effect.die("unused"),
           update: () => Effect.die("unused"),
           delete: () => Effect.fail(rejected),
         },
@@ -49,6 +50,7 @@ describe("mutateProjectWithClone", () => {
       const discarded: Array<ProjectId> = [];
       const projects = {
         create: () => Effect.die("unused"),
+        createProduct: () => Effect.die("unused"),
         update: () => Effect.die("unused"),
         // The delete event is already durable while its post-commit cleanup runs.
         delete: () =>

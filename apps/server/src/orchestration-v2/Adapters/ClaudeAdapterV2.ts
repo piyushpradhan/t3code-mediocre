@@ -1912,6 +1912,7 @@ export function makeClaudeQueryOptions(input: {
   readonly resume: boolean;
   readonly resumeSessionAt?: string;
   readonly cwd: string | null;
+  readonly productDirectories?: ReadonlyArray<string>;
   readonly attachmentsDir?: string;
   readonly settings?: ClaudeSettings;
   readonly promptSuggestions?: boolean;
@@ -2041,7 +2042,10 @@ export function makeClaudeQueryOptions(input: {
       type: "preset" as const,
       preset: "claude_code" as const,
       append: [
-        buildRuntimeInstructions({ harness: "Claude Code" }) +
+        buildRuntimeInstructions({
+          harness: "Claude Code",
+          productDirectories: input.productDirectories,
+        }) +
           (input.mcpServers === undefined
             ? ""
             : T3_CODE_ORCHESTRATION_INSTRUCTIONS +
@@ -2059,6 +2063,7 @@ export function makeClaudeQueryOptions(input: {
   };
   const additionalDirectories = [
     ...(input.cwd === null ? [] : [input.cwd]),
+    ...(input.productDirectories ?? []),
     ...(input.attachmentsDir === undefined ? [] : [input.attachmentsDir]),
     ...claudeLaunchArgDirectories(input.settings?.launchArgs),
   ];
@@ -3191,8 +3196,10 @@ export function claudeEffectiveQueryPolicyKey(
     readonly allowedTools?: ReadonlyArray<string>;
     readonly mcpServers?: ClaudeQueryOptions["mcpServers"];
   },
+  productDirectories?: ReadonlyArray<string>,
 ): string {
   return JSON.stringify({
+    productDirectories,
     runtimePolicy: claudeRuntimeQueryPolicyKey({
       ...queryPolicy,
       ...(mcpOverrides.allowedTools === undefined
@@ -11664,7 +11671,11 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               ? {}
               : { allowedTools: queryPolicy.allowedTools }),
           });
-          const queryPolicyKey = claudeEffectiveQueryPolicyKey(queryPolicy, mcpOverrides);
+          const queryPolicyKey = claudeEffectiveQueryPolicyKey(
+            queryPolicy,
+            mcpOverrides,
+            turnInput.runtimePolicy.additionalDirectories,
+          );
           const compiledSelection = compileClaudeModelSelection(
             turnInput.modelSelection,
             modelCatalog,
@@ -11772,6 +11783,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             resume: shouldResume,
             ...(resumeSessionAt === undefined ? {} : { resumeSessionAt }),
             cwd: turnInput.runtimePolicy.cwd,
+            ...(turnInput.runtimePolicy.additionalDirectories === undefined
+              ? {}
+              : { productDirectories: turnInput.runtimePolicy.additionalDirectories }),
             attachmentsDir,
             settings: adapterOptions.settings,
             // Delegated threads have no one typing, so they never ask for suggestions.

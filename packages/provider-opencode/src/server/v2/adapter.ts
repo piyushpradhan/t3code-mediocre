@@ -376,7 +376,7 @@ type TurnTerminal =
 type Rule = Permission.Rule;
 type RulesPolicy = Pick<
   ProviderAdapter.ProviderAdapterV2RuntimePolicy,
-  "runtimeMode" | "interactionMode"
+  "runtimeMode" | "interactionMode" | "additionalDirectories"
 >;
 type NativeForm = EventOf<"form.created">["data"]["form"];
 
@@ -433,6 +433,12 @@ const sessionRules = (
         rule("shell", "ask"),
         rule("edit", policy.runtimeMode === "auto-accept-edits" ? "allow" : "ask"),
         rule("external_directory", "ask"),
+        // Product folders count as the workspace; edits in them still follow the edit rule.
+        ...(policy.additionalDirectories ?? []).map((directory): Rule => ({
+          action: "external_directory",
+          resource: `${directory.replace(/\/$/, "")}/*`,
+          effect: "allow",
+        })),
       ]),
   ...grants,
   // Plan edits are re-allowed only for plan paths; free-tier sessions refuse denied shell/read.
@@ -4083,7 +4089,11 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
         if (mcpAvailable) state.mcp = wanted;
       }
       const instructions = [
-        buildRuntimeInstructions({ harness: "OpenCode", model: turnInput.modelSelection.model }),
+        buildRuntimeInstructions({
+          harness: "OpenCode",
+          model: turnInput.modelSelection.model,
+          productDirectories: turnInput.runtimePolicy.additionalDirectories,
+        }),
         t3OrchestrationSystemPrompt(mcpAvailable, mcpSession?.capabilities?.has("device") === true),
       ]
         .filter((part) => part !== undefined && part.length > 0)

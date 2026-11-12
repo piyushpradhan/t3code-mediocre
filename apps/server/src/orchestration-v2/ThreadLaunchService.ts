@@ -26,9 +26,11 @@ import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as FileSystem from "effect/FileSystem";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
@@ -45,7 +47,10 @@ import * as ProjectService from "../project/ProjectService.ts";
 import * as ProjectSetupScriptRunner from "../project/ProjectSetupScriptRunner.ts";
 import * as ManagedProjectFolders from "../project/ManagedProjectFolders.ts";
 import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
+import * as ServerConfig from "../config.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import { resolveWorktreesDirectory } from "../worktreesDirectory.ts";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as TextGeneration from "../textGeneration/TextGeneration.ts";
 import * as CommandReceiptStore from "./CommandReceiptStore.ts";
 import * as EventSink from "./EventSink.ts";
@@ -256,6 +261,9 @@ const make = Effect.gen(function* () {
     strategy.type === "root" && strategy.branch === undefined
       ? git.currentBranch(workspaceRoot).pipe(Effect.orElseSucceed(() => null))
       : Effect.succeed(strategy.branch ?? null);
+  const fileSystem = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const serverConfig = yield* ServerConfig.ServerConfig;
   const preparationScope = yield* Scope.make("sequential");
   const scheduledLaunches = yield* Ref.make<ReadonlySet<CommandId>>(new Set());
   yield* Effect.addFinalizer(() => Scope.close(preparationScope, Exit.void));
@@ -512,6 +520,38 @@ const make = Effect.gen(function* () {
             })
             .pipe(Effect.mapError(mapError(input, "update-thread", threadId)));
         }
+      }
+      const isProduct = project.productProjectIds != null;
+      if (input.workspaceStrategy.type === "worktree" && isProduct) {
+        // Turn start fills the folder with one worktree per Git member, on this branch.
+        const worktreesRoot = resolveWorktreesDirectory(
+          (yield* serverSettings.getSettings.pipe(Effect.orElseSucceed(() => null)))
+            ?.worktreesDirectory ?? "",
+          serverConfig.worktreesDir,
+          path,
+          yield* HostProcess.HomeDirectory,
+        );
+        if (worktreesRoot === null) {
+          return yield* mapError(
+            input,
+            "provision-worktree",
+            threadId,
+          )("The worktree location must be an absolute folder on this machine.");
+        }
+        const suffix = (yield* randomUuidV4).replaceAll("-", "").slice(0, 16);
+        const folder = path.join(
+          worktreesRoot,
+          path.basename(project.workspaceRoot),
+          `${(branch ?? "product").replace(/\//g, "-").slice(0, 23)}-${suffix}`,
+        );
+        yield* fileSystem
+          .makeDirectory(folder, { recursive: true })
+          .pipe(Effect.mapError(mapError(input, "provision-worktree", threadId)));
+        worktreePath = folder;
+        yield* setupTracker.update(threadId, (snapshot) => ({ ...snapshot, worktreePath, branch }));
+        yield* setupTracker.stageStatus(threadId, "fetch", "skipped");
+        yield* setupTracker.stageStatus(threadId, "checkout", "skipped");
+      } else if (input.workspaceStrategy.type === "worktree") {
         let startRef = input.workspaceStrategy.baseRef;
         let baseRefName = input.workspaceStrategy.baseRef;
         const remote =
@@ -607,22 +647,25 @@ const make = Effect.gen(function* () {
         const worktreeCwd = worktreePath;
         branchRename = yield* generateBranchNameFor(worktreeCwd, initialMessage).pipe(
           Effect.flatMap(({ branch: newBranch, exactName }) =>
-            git
-              .renameBranch({
-                cwd: worktreeCwd,
-                oldBranch,
-                newBranch,
-                ...(exactName ? { exactName: true } : {}),
-              })
-              .pipe(
-                // A cancel must see the renamed branch, or its cleanup deletes the old name.
-                Effect.tap((renamed) =>
-                  Effect.sync(() => {
-                    createdBranch = renamed.branch;
-                  }),
-                ),
-                Effect.uninterruptible,
-              ),
+            // A product folder has no branch of its own; turn start renames its member worktrees.
+            isProduct
+              ? Effect.succeed({ branch: newBranch })
+              : git
+                  .renameBranch({
+                    cwd: worktreeCwd,
+                    oldBranch,
+                    newBranch,
+                    ...(exactName ? { exactName: true } : {}),
+                  })
+                  .pipe(
+                    // A cancel must see the renamed branch, or its cleanup deletes the old name.
+                    Effect.tap((renamed) =>
+                      Effect.sync(() => {
+                        createdBranch = renamed.branch;
+                      }),
+                    ),
+                    Effect.uninterruptible,
+                  ),
           ),
           Effect.flatMap((renamed) =>
             Effect.gen(function* () {

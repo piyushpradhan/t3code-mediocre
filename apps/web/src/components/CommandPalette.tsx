@@ -64,6 +64,7 @@ import {
   CornerLeftUpIcon,
   FileSearchIcon,
   FolderGit2Icon,
+  BoxesIcon,
   FolderIcon,
   FolderPlusIcon,
   MessageSquareDashedIcon,
@@ -269,6 +270,7 @@ import { suggestAppAccessForRemote } from "./sourceControlAppAccessToast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { ComposerHandleContext, useComposerHandleContext } from "../composerHandleContext";
 import type { ChatComposerHandle } from "./chat/ChatComposer";
+import { openAddProductDialog } from "./AddProductDialog";
 import { pickableProjectGroups } from "@t3tools/client-runtime/state/project-grouping";
 import { buildSidebarProjectPickerEntries } from "../sidebarProjectGrouping";
 import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
@@ -490,7 +492,8 @@ function OpenCommandPaletteDialog(props: {
         ? scopeThreadRef(activeThread.environmentId, activeThread.id)
         : null;
   const openPanelPullRequestUrl = useOpenPanelPullRequestUrl(referenceThreadRef);
-  const activeThreadServerConfig = useServerConfigs().get(
+  const serverConfigs = useServerConfigs();
+  const activeThreadServerConfig = serverConfigs.get(
     activeThread?.environmentId ?? ("" as EnvironmentId),
   );
   const canShareActiveThreadWithGuest = useAtomValue(
@@ -851,7 +854,10 @@ function OpenCommandPaletteDialog(props: {
           ? undefined
           : projectPickerEntries.find((entry) => entry.isPreferred);
       const projectItems = buildNewThreadInProjectItems({
-        projects: pickerProjects.filter((project) => !isScratch(project)),
+        // Products get their own "New thread in product..." submenu.
+        projects: pickerProjects.filter(
+          (project) => !isScratch(project) && project.productProjectIds == null,
+        ),
         currentProjectKey: currentEntry
           ? `${currentEntry.targetProject.environmentId}:${currentEntry.targetProject.id}`
           : null,
@@ -912,6 +918,19 @@ function OpenCommandPaletteDialog(props: {
   const projectThreadItems = openingOrderThreadItems.map(
     (item) => projectJumpItems.get(item.value) ?? item,
   );
+  const productThreadItems = buildNewThreadInProjectItems({
+    projects: pickerProjects.filter((project) => project.productProjectIds != null),
+    currentProjectKey:
+      currentProject?.productProjectIds != null
+        ? `${currentProject.environmentId}:${currentProject.id}`
+        : null,
+    projectGroupByTargetKey,
+    locationByEnvironmentId: projectEnvironmentLocationById,
+    pin: projectPin,
+    runProject: async (project) => {
+      await handleNewThread(scopeProjectRef(project.environmentId, project.id));
+    },
+  });
 
   const {
     threadItems: allThreadItems,
@@ -1318,6 +1337,18 @@ function OpenCommandPaletteDialog(props: {
       addonIcon: <SquarePenIcon className={ADDON_ICON_CLASS} />,
       groups: [{ value: NEW_THREAD_IN_GROUP, label: "Projects", items: projectThreadItems }],
     });
+
+    if (productThreadItems.length > 0) {
+      actionItems.push({
+        kind: "submenu",
+        value: "action:new-thread-in-product",
+        searchTerms: ["new thread", "product", "pick", "choose", "select", "multi repo"],
+        title: "New thread in product...",
+        icon: <BoxesIcon className={ITEM_ICON_CLASS} />,
+        addonIcon: <BoxesIcon className={ADDON_ICON_CLASS} />,
+        groups: [{ value: "products", label: "Products", items: productThreadItems }],
+      });
+    }
   }
 
   if (scratchTargetEnvironmentId !== null) {
@@ -1588,6 +1619,30 @@ function OpenCommandPaletteDialog(props: {
   };
   actionItems.push(addProjectAction);
 
+  if (
+    [...serverConfigs.values()].some(
+      (config) => config.environment.capabilities.projectProducts === true,
+    )
+  ) {
+    actionItems.push({
+      kind: "action",
+      value: "action:add-product",
+      searchTerms: [
+        "add product",
+        "new product",
+        "group",
+        "projects",
+        "repositories",
+        "multi repo",
+      ],
+      title: "Add product",
+      icon: <BoxesIcon className={ITEM_ICON_CLASS} />,
+      run: async () => {
+        openAddProductDialog(defaultAddProjectEnvironmentId ?? null);
+      },
+    });
+  }
+
   if (wslAddProjectEnvironmentOption) {
     actionItems.push({
       kind: "action",
@@ -1800,6 +1855,9 @@ function OpenCommandPaletteDialog(props: {
                 // Every project archived and no "No project" home leaves only adding one.
                 items: projectThreadItems.length > 0 ? projectThreadItems : [addProjectAction],
               },
+              ...(productThreadItems.length > 0
+                ? [{ value: "products", label: "Products", items: productThreadItems }]
+                : []),
             ]
           : currentView?.groups[0]?.value === "themes"
             ? changeThemeItem.groups

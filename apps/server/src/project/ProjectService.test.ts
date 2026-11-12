@@ -543,6 +543,12 @@ it.layer(layerTest)("ProjectService", (it) => {
         title: "Delete retry",
         workspaceRoot: "/work/delete-retry",
       });
+      // Enrichment finishing between the deletes would change the retried result.
+      yield* waitForProject(
+        service,
+        projectId,
+        (project) => project.faviconPath != null && project.repositoryIdentity != null,
+      );
       const input = { commandId: CommandId.make("command:delete-retry:delete"), projectId };
       const deleted = yield* service.delete(input);
       assert.deepEqual(yield* service.delete(input), deleted);
@@ -551,6 +557,46 @@ it.layer(layerTest)("ProjectService", (it) => {
         WHERE stream_id = ${projectId} AND event_type = 'project.deleted'
       `;
       assert.deepEqual(events, [{ command_id: input.commandId }]);
+    }),
+  );
+
+  it.effect("creates a product in its own folder from other projects", () =>
+    Effect.gen(function* () {
+      const service = yield* ProjectService.ProjectService;
+      const create = (name: string) =>
+        service.create({
+          commandId: CommandId.make(`command:product:${name}`),
+          projectId: ProjectId.make(`project:product:${name}`),
+          title: name,
+          workspaceRoot: `/work/product-${name}`,
+        });
+      const app = yield* create("app");
+      const lib = yield* create("lib");
+      const productId = ProjectId.make("project:product:acme");
+      const product = yield* service.createProduct({
+        commandId: CommandId.make("command:product:acme"),
+        projectId: productId,
+        title: "Acme",
+        productProjectIds: [app.id, lib.id, lib.id],
+      });
+      assert.deepEqual(product.productProjectIds, [app.id, lib.id]);
+      assert.match(product.workspaceRoot, /[/\\]products[/\\]acme-project:$/);
+      assert.isNull(app.productProjectIds);
+
+      const invalid = (projectId: ProjectId, productProjectIds: ReadonlyArray<ProjectId>) =>
+        service
+          .update({
+            commandId: CommandId.make(`command:product:bad:${projectId}`),
+            projectId,
+            productProjectIds,
+          })
+          .pipe(Effect.flip);
+      assert.instanceOf(yield* invalid(app.id, [lib.id]), ProjectService.ProjectInvalidError);
+      assert.instanceOf(yield* invalid(productId, []), ProjectService.ProjectInvalidError);
+      assert.instanceOf(
+        yield* invalid(productId, [ProjectId.make("project:product:missing")]),
+        ProjectService.ProjectNotFoundError,
+      );
     }),
   );
 

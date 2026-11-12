@@ -2229,9 +2229,10 @@ export default function ChatView(props: ChatViewProps) {
       ? (pendingServerThreadStartFromOriginByThreadId[activeThread?.id ?? ""] ??
         activeProjectSettings.settings.newWorktreesStartFromOrigin)
       : false;
+  const isProduct = activeProject?.productProjectIds != null;
   const sendEnvMode = resolveSendEnvMode({
     requestedEnvMode: envMode,
-    isGitRepo,
+    isGitRepo: isGitRepo || isProduct,
   });
   const localCheckoutBranchMismatch = isServerThread
     ? resolveLocalCheckoutBranchMismatch({
@@ -3762,6 +3763,7 @@ export default function ChatView(props: ChatViewProps) {
                                   worktreePath={activeThread.worktreePath}
                                   isServerThread={isServerThread}
                                   showGitControls={isGitRepo}
+                                  isProduct={isProduct}
                                   {...(routeKind === "draft" && draftId ? { draftId } : {})}
                                   onEnvModeChange={onEnvModeChangeStable}
                                   startFromOrigin={startFromOrigin}
@@ -3878,6 +3880,7 @@ export default function ChatView(props: ChatViewProps) {
                   gitCwd={gitCwd}
                   workspaceMutationId={workspaceMutationId}
                   isGitRepo={isGitRepo}
+                  isProduct={isProduct}
                   envLocked={envLocked}
                   availableEnvironments={logicalProjectEnvironments}
                   autoEnvironmentLabel={autoEnvironmentLabel}

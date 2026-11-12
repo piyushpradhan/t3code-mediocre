@@ -140,6 +140,11 @@ function NewTaskHeader(props: {
                   icon: "plus",
                   onPress: () => navigation.dispatch(StackActions.push("AddProject")),
                 },
+                {
+                  accessibilityLabel: "Add product",
+                  icon: "square.grid.2x2",
+                  onPress: () => navigation.dispatch(StackActions.push("AddProduct")),
+                },
               ]
             : []
         }

@@ -114,6 +114,7 @@ interface EnvironmentOption {
   readonly machine: EnvironmentMachineKind;
   readonly baseDirectory: string | null;
   readonly newProjectsRoot: string | null;
+  readonly canCreateProduct: boolean;
   readonly connectionState: EnvironmentConnectionPhase;
   readonly connectionError: string | null;
   readonly connectionErrorTraceId: string | null;
@@ -409,6 +410,7 @@ function useEnvironmentOptions(
         machine: resolveEnvironmentMachineKind(config ?? null),
         baseDirectory: config?.settings.addProjectBaseDirectory ?? null,
         newProjectsRoot: config?.newProjectsRoot ?? null,
+        canCreateProduct: config?.environment.capabilities.projectProducts === true,
         connectionState: runtime?.connectionState ?? "available",
         connectionError: runtime?.connectionError ?? null,
         connectionErrorTraceId: runtime?.connectionErrorTraceId ?? null,
@@ -1506,6 +1508,260 @@ export function AddProjectDestinationScreen(props: {
         </>
       ) : (
         <EmptyEnvironmentState />
+      )}
+    </AddProjectShell>
+  );
+}
+
+export function AddProductScreen(props: { readonly environmentId?: string | string[] }) {
+  const openNewTaskDraft = useOpenNewTaskDraft();
+  const navigation = useNavigation();
+  // Older servers cannot create products.
+  const environmentOptions = useEnvironmentOptions().filter((option) => option.canCreateProduct);
+  const [selectedEnvironmentId, setSelectedEnvironmentId] = useState(
+    () => stringParam(props.environmentId) as EnvironmentId | null,
+  );
+  const environment = resolveAddProjectEnvironment(environmentOptions, selectedEnvironmentId);
+  const environmentId = environment?.environmentId ?? null;
+  const createProduct = useAtomCommand(projectEnvironment.createProduct, { reportFailure: false });
+  const createProject = useAtomCommand(projectEnvironment.create, { reportFailure: false });
+  const startProjectClone = useAtomCommand(sourceControlEnvironment.startProjectClone, {
+    reportFailure: false,
+  });
+  const [name, setName] = useState("");
+  const [selected, setSelected] = useState<ReadonlySet<ProjectId>>(new Set());
+  const [adding, setAdding] = useState<"folder" | "clone" | null>(null);
+  const [addingValue, setAddingValue] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const candidates = useProjects().filter(
+    (project) =>
+      project.environmentId === environmentId &&
+      project.isScratch !== true &&
+      project.productProjectIds == null &&
+      (project.archivedAt == null || selected.has(project.id)),
+  );
+  const trimmedName = name.trim();
+  // State lags a render behind, so a double tap could start a second create.
+  const submittingRef = useRef(false);
+  const busy = async (work: () => Promise<void>) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setError(null);
+    setIsSubmitting(true);
+    await work();
+    submittingRef.current = false;
+    setIsSubmitting(false);
+  };
+  const select = (projectId: ProjectId) =>
+    setSelected((current) => new Set([...current, projectId]));
+
+  const addMember = () =>
+    busy(async () => {
+      if (environment === null || adding === null) return;
+      const value = addingValue.trim();
+      const projectId = ProjectId.make(uuidv4());
+      if (adding === "folder") {
+        const result = await createProject({
+          environmentId: environment.environmentId,
+          input: { projectId, title: inferProjectTitleFromPath(value), workspaceRoot: value },
+        });
+        if (AsyncResult.isFailure(result)) {
+          setError(errorMessage(Cause.squash(result.cause)));
+          return;
+        }
+      } else {
+        // `owner/repo` goes through the configured GitHub account, like Add project.
+        const shorthand = /^[\w.-]+\/[\w.-]+$/.test(value);
+        const result = await startProjectClone({
+          environmentId: environment.environmentId,
+          input: {
+            projectId,
+            title: getCloneDirectoryName(value) || value,
+            createdAt: new Date().toISOString(),
+            ...(shorthand
+              ? { provider: SourceControlProviderKind.make("github"), repository: value }
+              : { remoteUrl: value }),
+            destinationPath: getCloneDestinationPath(
+              getAddProjectInitialQuery(environment.baseDirectory),
+              getCloneDirectoryPath(value, environment.ghqCloneLayout),
+            ),
+          },
+        });
+        if (AsyncResult.isFailure(result)) {
+          setError(errorMessage(Cause.squash(result.cause)));
+          return;
+        }
+      }
+      select(projectId);
+      setAdding(null);
+      setAddingValue("");
+    });
+
+  const submit = () =>
+    busy(async () => {
+      if (environmentId === null || trimmedName.length === 0 || selected.size === 0) return;
+      const originRoute = getActiveRoute(navigation);
+      const projectId = ProjectId.make(uuidv4());
+      const result = await createProduct({
+        environmentId,
+        input: { projectId, title: trimmedName, productProjectIds: [...selected] },
+      });
+      if (AsyncResult.isFailure(result)) {
+        setError(errorMessage(Cause.squash(result.cause)));
+        return;
+      }
+      const project = await waitForProject({ environmentId, projectId }, 15_000);
+      if (project === null) {
+        setError(
+          "The product was created but has not reached this device yet. It will appear in the project list once the connection catches up.",
+        );
+        return;
+      }
+      openNewTaskDraft({ environmentId, projectId, title: trimmedName }, originRoute);
+    });
+
+  const symbol = (name: "checkmark" | "folder.badge.plus" | "arrow.triangle.branch") => (
+    <SymbolView
+      name={name}
+      size={Platform.OS === "android" ? 24 : 17}
+      tintColorClassName="accent-icon"
+      type="monochrome"
+    />
+  );
+
+  return (
+    <AddProjectShell title="Add product">
+      {error ? <ErrorBanner message={error} /> : null}
+      <TextInput
+        className="h-12 min-h-12 rounded-[24px] px-4 py-0 text-base leading-snug"
+        value={name}
+        onChangeText={setName}
+        autoCorrect={false}
+        autoFocus
+        placeholder="Product name"
+        returnKeyType="done"
+      />
+      <Text className="px-1 text-sm leading-snug text-foreground-muted">
+        Group projects so one thread works across all of them. Threads start in a folder that holds
+        every project; worktree threads get a worktree of each Git project on one branch.
+      </Text>
+      {environmentOptions.length > 1 ? (
+        <>
+          <SectionTitle>Machine</SectionTitle>
+          <ListSection>
+            {environmentOptions.map((option, index) => {
+              const isSelected = option.environmentId === environmentId;
+              return (
+                <ListRow
+                  key={option.environmentId}
+                  title={option.label}
+                  icon={
+                    <EnvironmentMachineSymbol
+                      kind={option.machine}
+                      size={Platform.OS === "android" ? 24 : 17}
+                      tintColorClassName="accent-icon"
+                    />
+                  }
+                  selected={isSelected}
+                  disabled={isSubmitting}
+                  isFirst={index === 0}
+                  right={isSelected ? symbol("checkmark") : null}
+                  onPress={() => {
+                    if (isSelected) return;
+                    setSelectedEnvironmentId(option.environmentId);
+                    setSelected(new Set());
+                  }}
+                />
+              );
+            })}
+          </ListSection>
+        </>
+      ) : null}
+      <SectionTitle>Projects</SectionTitle>
+      <ListSection>
+        {candidates.map((project, index) => (
+          <ListRow
+            key={project.id}
+            title={project.title}
+            subtitle={project.workspaceRoot}
+            icon={symbol("folder.badge.plus")}
+            isFirst={index === 0}
+            disabled={isSubmitting}
+            right={
+              <ThemedSwitch
+                accessibilityLabel={`Include ${project.title}`}
+                value={selected.has(project.id)}
+                onValueChange={(checked) =>
+                  setSelected((current) => {
+                    const next = new Set(current);
+                    if (checked) next.add(project.id);
+                    else next.delete(project.id);
+                    return next;
+                  })
+                }
+              />
+            }
+          />
+        ))}
+        <ListRow
+          title="Add folder"
+          subtitle="A folder on this machine"
+          icon={symbol("folder.badge.plus")}
+          isFirst={candidates.length === 0}
+          selected={adding === "folder"}
+          disabled={isSubmitting || environment === null}
+          onPress={() => setAdding(adding === "folder" ? null : "folder")}
+        />
+        <ListRow
+          title="Clone repository"
+          subtitle="A Git URL or owner/repo"
+          icon={symbol("arrow.triangle.branch")}
+          isFirst={false}
+          selected={adding === "clone"}
+          disabled={isSubmitting || environment === null}
+          onPress={() => setAdding(adding === "clone" ? null : "clone")}
+        />
+      </ListSection>
+      {adding !== null ? (
+        <>
+          <TextInput
+            className="h-12 min-h-12 rounded-[24px] px-4 py-0 text-base leading-snug"
+            value={addingValue}
+            onChangeText={setAddingValue}
+            autoCorrect={false}
+            autoCapitalize="none"
+            autoFocus
+            placeholder={
+              adding === "folder"
+                ? getAddProjectInitialQuery(environment?.baseDirectory)
+                : "https://github.com/owner/repo.git"
+            }
+            returnKeyType="done"
+            onSubmitEditing={() => void addMember()}
+          />
+          <PrimaryActionButton
+            label={adding === "folder" ? "Add folder" : "Clone"}
+            disabled={isSubmitting || addingValue.trim().length === 0}
+            onPress={() => void addMember()}
+          />
+          <Button
+            label="Cancel"
+            tone="secondary"
+            fullWidth
+            disabled={isSubmitting}
+            onPress={() => {
+              setAdding(null);
+              setAddingValue("");
+            }}
+          />
+        </>
+      ) : (
+        <PrimaryActionButton
+          label={isSubmitting ? "Creating..." : "Create product"}
+          disabled={isSubmitting || trimmedName.length === 0 || selected.size === 0}
+          onPress={() => void submit()}
+        />
       )}
     </AddProjectShell>
   );

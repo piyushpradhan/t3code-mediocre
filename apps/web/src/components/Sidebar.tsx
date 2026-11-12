@@ -1,3 +1,4 @@
+import { openAddProductDialog } from "./AddProductDialog";
 import { attachSidebarTree } from "../lib/sidebarTree";
 import { type EnvironmentId, type ScopedProjectRef } from "@t3tools/contracts";
 import type { EnvironmentServerConfig } from "@t3tools/client-runtime/connection";
@@ -897,6 +898,9 @@ function readRouteThreadKey(router: AnyRouter): string | null {
 }
 
 export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReveal }) {
+  const canAddProduct = [...useServerConfigs().values()].some(
+    (config) => config.environment.capabilities.projectProducts === true,
+  );
   const {
     projects,
     serverConfigs,
@@ -3176,6 +3180,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 </Combobox>
               }
               onNewProject={openAddProjectCommandPalette}
+              onNewProduct={canAddProduct ? () => openAddProductDialog() : undefined}
               onNewThread={handleNewThreadClick}
               newThreadDisabled={projects.length === 0}
               newThreadShortcutLabel={newThreadShortcutLabel}

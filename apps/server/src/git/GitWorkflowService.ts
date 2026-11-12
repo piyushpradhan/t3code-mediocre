@@ -2,6 +2,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 
 import {
   GitManagerError,
@@ -32,6 +33,7 @@ import {
 import * as GitManager from "./GitManager.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as VcsDriverRegistry from "../vcs/VcsDriverRegistry.ts";
+import { removeEmptyDirectory } from "../vcs/removeEmptyDirectory.ts";
 import { withWorkspaceLease } from "../workspace/workspaceLease.ts";
 
 export class GitWorkflowService extends Context.Service<
@@ -178,6 +180,53 @@ export const make = Effect.gen(function* () {
   const git = yield* GitVcsDriver.GitVcsDriver;
   const gitManager = yield* GitManager.GitManager;
   const fileSystem = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+
+  // A product thread's worktree is a folder of member worktrees and links to member folders.
+  const removeProductFolder = Effect.fn("GitWorkflowService.removeProductFolder")(function* (
+    input: VcsRemoveWorktreeInput,
+  ) {
+    const fail = (detail: string, cause?: unknown) =>
+      new GitCommandError({
+        operation: "GitWorkflowService.removeWorktree",
+        command: "git worktree remove",
+        cwd: input.cwd,
+        detail,
+        ...(cause === undefined ? {} : { cause }),
+      });
+    const entries = yield* fileSystem
+      .readDirectory(input.path)
+      .pipe(Effect.mapError((cause) => fail(`Could not read ${input.path}.`, cause)));
+    for (const name of entries) {
+      const entry = path.join(input.path, name);
+      const isLink = yield* fileSystem.readLink(entry).pipe(
+        Effect.as(true),
+        Effect.orElseSucceed(() => false),
+      );
+      if (isLink) {
+        yield* fileSystem
+          .remove(entry)
+          .pipe(Effect.mapError((cause) => fail(`Could not remove ${entry}.`, cause)));
+      } else if (
+        yield* fileSystem.exists(path.join(entry, ".git")).pipe(Effect.orElseSucceed(() => false))
+      ) {
+        yield* git.removeWorktree({ cwd: entry, path: entry, force: input.force ?? false });
+      }
+    }
+    const removed = yield* removeEmptyDirectory(input.path).pipe(
+      Effect.mapError((cause) => fail(`Could not remove ${input.path}.`, cause)),
+    );
+    if (!removed) return yield* fail(`${input.path} still has files that are not product members.`);
+  });
+
+  const isProductFolder = (folder: string) =>
+    Effect.all([
+      fileSystem.exists(path.join(folder, ".git")),
+      fileSystem.stat(folder).pipe(Effect.map((info) => info.type === "Directory")),
+    ]).pipe(
+      Effect.map(([hasGit, isDirectory]) => isDirectory && !hasGit),
+      Effect.orElseSucceed(() => false),
+    );
 
   // Nested projects and path aliases must share the checkout's branch-mutation lease.
   const withCheckoutLease = <A, E, R>(rootPath: string, effect: Effect.Effect<A, E, R>) =>
@@ -471,8 +520,9 @@ export const make = Effect.gen(function* () {
         );
       },
     ),
-    removeWorktree: Effect.fn("GitWorkflowService.removeWorktree")(function (input) {
-      return ensureGitCommand("GitWorkflowService.removeWorktree", input.cwd).pipe(
+    removeWorktree: Effect.fn("GitWorkflowService.removeWorktree")(function* (input) {
+      if (yield* isProductFolder(input.path)) return yield* removeProductFolder(input);
+      return yield* ensureGitCommand("GitWorkflowService.removeWorktree", input.cwd).pipe(
         Effect.andThen(git.removeWorktree(input)),
       );
     }),

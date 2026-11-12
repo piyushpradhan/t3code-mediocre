@@ -20,7 +20,7 @@ import { Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { projectEnvironment } from "../../state/projects";
-import { useThreadShells } from "../../state/entities";
+import { useProjects, useThreadShells } from "../../state/entities";
 import { appAtomRegistry } from "../../state/atom-registry";
 import {
   clearComposerDraft,
@@ -372,6 +372,17 @@ function ProjectOverviewContent(props: {
         </SettingsSection>
       ) : null}
 
+      {props.members.map((member) => (
+        <ProductSection
+          key={`product:${member.environmentId}:${member.id}`}
+          member={member}
+          target={props.connectedTargets.find(
+            (entry) => entry.environmentId === member.environmentId,
+          )}
+          showEnvironment={props.members.length > 1}
+        />
+      ))}
+
       <SettingsSection title="Checkouts">
         {props.members.map((member, index) => {
           const environment = props.environments.find(
@@ -434,6 +445,63 @@ function ProjectOverviewContent(props: {
         />
       </SettingsSection>
     </>
+  );
+}
+
+/** Product members are folders on the same machine, so each checkout picks its own. */
+function ProductSection(props: {
+  readonly member: EnvironmentProject;
+  readonly target: SettingsTarget | undefined;
+  readonly showEnvironment: boolean;
+}) {
+  const { member } = props;
+  const projects = useProjects();
+  const canEdit = useEnvironmentScope(member.environmentId, AuthOrchestrationOperateScope);
+  const updateProject = useAtomCommand(projectEnvironment.update, {
+    label: "product update",
+    reportFailure: true,
+  });
+  if (
+    member.productProjectIds == null ||
+    props.target?.serverConfig.environment.capabilities.projectProducts !== true
+  )
+    return null;
+  const selected = new Set(member.productProjectIds);
+  const candidates = projects.filter(
+    (project) =>
+      project.environmentId === member.environmentId &&
+      project.id !== member.id &&
+      project.isScratch !== true &&
+      project.productProjectIds == null &&
+      (project.archivedAt == null || selected.has(project.id)),
+  );
+  return (
+    <SettingsSection
+      title={props.showEnvironment ? `Product · ${props.target.label}` : "Product"}
+      footer="Threads start in the product's folder, which holds every project switched on here. Threads in a worktree get a worktree of each Git project, on the same branch."
+    >
+      {candidates.map((project) => (
+        <SettingsSwitchRow
+          key={project.id}
+          label={project.title}
+          subtitle={project.workspaceRoot}
+          value={selected.has(project.id)}
+          // A product keeps at least one project.
+          disabled={!canEdit || (selected.size === 1 && selected.has(project.id))}
+          onValueChange={(checked) =>
+            void updateProject({
+              environmentId: member.environmentId,
+              input: {
+                projectId: member.id,
+                productProjectIds: checked
+                  ? [...selected, project.id]
+                  : [...selected].filter((id) => id !== project.id),
+              },
+            })
+          }
+        />
+      ))}
+    </SettingsSection>
   );
 }
 

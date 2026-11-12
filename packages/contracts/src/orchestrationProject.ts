@@ -14,6 +14,7 @@ export const OrchestrationProjectShell = Schema.Struct({
   defaultThreadEnvMode: Schema.optional(Schema.NullOr(ThreadEnvMode)),
   // Opt-in because background sync performs network I/O and may move the checkout.
   autoPull: Schema.optional(Schema.Boolean),
+  productProjectIds: Schema.optional(Schema.NullOr(Schema.Array(ProjectId))),
   faviconPath: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   projectIcon: Schema.optional(Schema.NullOr(ReceivedProjectIcon)),
   scripts: Schema.Array(ProjectScript),
