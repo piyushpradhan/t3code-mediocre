@@ -88,6 +88,7 @@ import Migration0082 from "./Migrations/082_TurnItemConversationIndex.ts";
 import Migration0083 from "./Migrations/083_CommandReadIndexes.ts";
 import Migration0084 from "./Migrations/084_LastExecutedRunIndex.ts";
 import Migration0085 from "./Migrations/085_TurnItemCounts.ts";
+import Migration0086 from "./Migrations/086_ProjectionProjectsProductMembers.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -176,6 +177,7 @@ const migrationEntries = [
   [83, "CommandReadIndexes", Migration0083],
   [84, "LastExecutedRunIndex", Migration0084],
   [85, "TurnItemCounts", Migration0085],
+  [86, "ProjectionProjectsProductMembers", Migration0086],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
@@ -259,9 +261,23 @@ export interface RunMigrationsOptions {
   readonly toMigrationInclusive?: number | undefined;
 }
 
+// Release the fork's former note migration id, which upstream now uses for OrchestrationV2.
+const releaseForkThreadNoteMigrationId = Effect.fn("releaseForkThreadNoteMigrationId")(
+  function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const tables = yield* sql`
+      SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'effect_sql_migrations'
+    `;
+    if (tables.length === 0) return;
+    yield* sql`DELETE FROM effect_sql_migrations WHERE migration_id = 55 AND name = 'ProjectionThreadNote'`;
+  },
+);
+
+/** Runs pending migrations; returns the [id, name] tuples that ran. */
 export const runMigrations = Effect.fn("runMigrations")(function* ({
   toMigrationInclusive,
 }: RunMigrationsOptions = {}) {
+  yield* releaseForkThreadNoteMigrationId();
   const includesV2 =
     toMigrationInclusive === undefined || toMigrationInclusive >= FIRST_V2_MIGRATION_ID;
   const previewMigrations = includesV2 ? yield* reconcileV2PreviewMigration() : [];

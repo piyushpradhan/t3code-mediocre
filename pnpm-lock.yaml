@@ -984,6 +984,9 @@ importers:
       '@t3tools/provider-testing':
         specifier: workspace:*
         version: link:../../packages/provider-testing
+      '@t3tools/px0-sdk':
+        specifier: workspace:*
+        version: link:../../packages/px0-sdk
       '@t3tools/secret-provider-core':
         specifier: workspace:*
         version: link:../../packages/secret-provider-core
@@ -2003,6 +2006,12 @@ importers:
       '@types/node':
         specifier: 24.12.4
         version: 24.12.4
+
+  packages/px0-sdk:
+    devDependencies:
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
 
   packages/secret-provider-core:
     dependencies:

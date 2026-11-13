@@ -162,6 +162,8 @@ export const Project = Schema.Struct({
   defaultThreadEnvMode: Schema.optional(Schema.NullOr(ThreadEnvMode)),
   // Opt-in because background sync performs network I/O and may move the checkout.
   autoPull: Schema.optional(Schema.Boolean),
+  // Set only on products: the projects whose folders its threads work in.
+  productProjectIds: Schema.optional(Schema.NullOr(Schema.Array(ProjectId))),
   scripts: Schema.Array(ProjectScript),
   pinnedAt: Schema.optional(Schema.NullOr(IsoDateTime)),
   archivedAt: Schema.optional(Schema.NullOr(IsoDateTime)),
@@ -194,6 +196,11 @@ export const ProjectUpdatePayload = Schema.Struct({
   projectIcon: Schema.optional(Schema.NullOr(ProjectIconOverride)),
   faviconPath: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   defaultThreadEnvMode: Schema.optional(Schema.NullOr(ThreadEnvMode)),
+  productProjectIds: Schema.optional(
+    Schema.Array(ProjectId).annotate({
+      description: "Products only: the projects on this environment grouped in it.",
+    }),
+  ),
   scripts: Schema.optional(Schema.Array(ProjectScript)),
   pinned: Schema.optional(Schema.Boolean),
   archived: Schema.optional(
@@ -216,6 +223,13 @@ export const ProjectMutation = Schema.Union([
     commandId: CommandId,
     projectId: ProjectId,
     ...ProjectUpdatePayload.fields,
+  }),
+  Schema.Struct({
+    type: Schema.Literal("product.create"),
+    commandId: CommandId,
+    projectId: ProjectId,
+    title: TrimmedNonEmptyString,
+    productProjectIds: Schema.Array(ProjectId),
   }),
   Schema.Struct({
     type: Schema.Literal("project.delete"),

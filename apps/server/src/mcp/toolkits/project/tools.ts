@@ -82,6 +82,12 @@ const ProjectCreateTool = Tool.make("t3_project_create", {
     environmentId: OrchestratorMcpEnvironmentTarget,
     ...ProjectCreatePayload.fields,
     workspaceRoot: Schema.optional(ProjectCreatePayload.fields.workspaceRoot),
+    productProjectIds: Schema.optional(
+      Schema.Array(ProjectId).annotate({
+        description:
+          "Makes a product instead: a folder whose threads work across these projects. Title only.",
+      }),
+    ),
   }),
   success: Schema.Struct({ ...Project.fields, commitError: Schema.optional(Schema.String) }),
   dependencies: [...shared.dependencies, ManagedProjectFolders.ManagedProjectFolders],

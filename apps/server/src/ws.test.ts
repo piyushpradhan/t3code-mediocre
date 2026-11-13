@@ -1,3 +1,4 @@
+import * as SkillSuggestions from "./provider/SkillSuggestions.ts";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -86,6 +87,7 @@ import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
 import * as PeerLinks from "./peer/PeerLinks.ts";
 import * as PortScanner from "./preview/PortScanner.ts";
 import * as PreviewManager from "./preview/Manager.ts";
+import * as Px0Engine from "./px0/Engine.ts";
 import * as ProcessDiagnostics from "./diagnostics/ProcessDiagnostics.ts";
 import * as ProcessResourceMonitor from "./diagnostics/ProcessResourceMonitor.ts";
 import * as ProjectCloneTracker from "./project/ProjectCloneTracker.ts";
@@ -822,6 +824,7 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(PeerLinkRequests.PeerLinkRequests)({}),
   Layer.mock(PortScanner.PortDiscovery)({ trackAgent: () => () => undefined }),
   Layer.mock(PreviewManager.PreviewManager)({}),
+  Layer.mock(Px0Engine.Px0Engine)({}),
   Layer.mock(ProcessDiagnostics.ProcessDiagnostics)({}),
   Layer.mock(ProcessResourceMonitor.ProcessResourceMonitor)({}),
   Layer.mock(ProjectCloneTracker.ProjectCloneTracker)({}),
@@ -921,6 +924,7 @@ it.effect.each([
       const directStopped = yield* Deferred.make<void>();
       const responses = yield* Queue.unbounded<ServerConfigStreamEvent>();
       const configRpcServices = Layer.mergeAll(
+        SkillSuggestions.layer,
         layerUnusedConfigRpcServices,
         Layer.mock(ExternalLauncher.ExternalLauncher)({
           resolveAvailableEditors: () =>
@@ -1179,6 +1183,7 @@ it.effect("on-demand clients get provider config without workspace snapshots", (
     const pulled = yield* Queue.unbounded<void>();
     const responses = yield* Queue.unbounded<unknown>();
     const configRpcServices = Layer.mergeAll(
+      SkillSuggestions.layer,
       layerUnusedConfigRpcServices,
       Layer.mock(ExternalLauncher.ExternalLauncher)({
         resolveAvailableEditors: () => Effect.succeed([]),
@@ -1556,6 +1561,7 @@ it.effect("a missing thread worktree gets its project's skills in the cwd snapsh
     const responses = yield* Queue.unbounded<unknown>();
     const services = Layer.mergeAll(
       layerUnusedConfigRpcServices,
+      SkillSuggestions.layer,
       Layer.mock(ProviderRegistry.ProviderRegistry)({
         getProviders: Effect.succeed([provider]),
         refreshWorkspaceSnapshot: (input) =>
@@ -1679,6 +1685,7 @@ it.effect("a git action that fails partway still refreshes the repository status
     const exits = yield* Queue.unbounded<Exit.Exit<unknown, unknown>>();
     const services = Layer.mergeAll(
       layerUnusedConfigRpcServices,
+      SkillSuggestions.layer,
       Layer.mock(GitWorkflowService.GitWorkflowService)({
         runStackedAction: () => Effect.fail(failure),
       }),
@@ -1747,6 +1754,7 @@ it.effect("a publish whose push fails still refreshes the new remote", () =>
     const exits = yield* Queue.unbounded<string>();
     const services = Layer.mergeAll(
       layerUnusedConfigRpcServices,
+      SkillSuggestions.layer,
       Layer.mock(SourceControlRepositoryService.SourceControlRepositoryService)({
         publishRepository: (input) =>
           Effect.fail(
@@ -2227,6 +2235,7 @@ it.effect("ACP session RPCs list a thread missing its history and repair it on i
     } as unknown as ProviderInstance;
     const dependencies = Layer.mergeAll(
       layerUnusedConfigRpcServices,
+      Layer.mock(SkillSuggestions.SkillSuggestions)({}),
       Layer.fresh(layerConfigSources),
       Layer.mock(ExternalLauncher.ExternalLauncher)({}),
       Layer.mock(ProviderRegistry.ProviderRegistry)({}),

@@ -251,6 +251,21 @@ Results also list folders in the worktree folder that no thread uses, with their
 Browser captures and rotated logs have separate retention periods. Expired capture links stop
 working. Current logs, message attachments, and browser profiles are kept.
 
+## Products: work across several projects
+
+A product groups projects on the same machine so one thread can work across all of them, for
+example an app, its API, and a shared library. Choose **Add product** next to **Add project** in
+the sidebar or command palette, name it, and pick its projects. **Add folder** and **Clone
+repository** add a project you have not added yet. On mobile, **Add product** sits beside **Add
+project** on the new thread screen. A product appears in the sidebar like a project, with its own
+threads and settings. Change its projects later in Settings → Projects → **Product**.
+
+A product thread starts in the product's own folder, which holds a link to each project's folder.
+In **New worktree** mode, that folder instead holds a worktree of each Git project on one shared
+branch, and links to the projects that are not Git repositories. Deleting the thread's worktree
+deletes those worktrees too. The product folder is not a Git repository, so diffs, checkpoints,
+and the source control panel are not available at the product level.
+
 ## Project icons
 
 Select the project and open Project to choose an icon, emoji, monogram, or image. The choice applies to

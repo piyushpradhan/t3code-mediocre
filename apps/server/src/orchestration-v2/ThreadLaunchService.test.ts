@@ -185,6 +185,7 @@ function makeHarness(options: HarnessOptions = {}) {
     Layer.mock(TerminalManager.TerminalManager)({ close: closeTerminal }),
     Layer.succeed(ProjectService.ProjectService, {
       create: () => Effect.die("unused"),
+      createProduct: () => Effect.die("unused"),
       bootstrap: () => Effect.die("unused"),
       update: () => Effect.die("unused"),
       delete: () => Effect.die("unused"),
@@ -244,6 +245,9 @@ function makeHarness(options: HarnessOptions = {}) {
         layerReceipts,
         layerOrchestrator,
         IdAllocator.layer,
+        ServerConfig.layerTest(process.cwd(), { prefix: "t3-launch-" }).pipe(
+          Layer.provideMerge(NodeServices.layer),
+        ),
       ),
     ),
   );
@@ -258,6 +262,7 @@ function makeHarness(options: HarnessOptions = {}) {
               defaultModelSelection: project.defaultModelSelection,
               defaultThreadEnvMode: null,
               autoPull: false,
+              productProjectIds: null,
               faviconPath: null,
               projectIcon: null,
               scripts: project.scripts,

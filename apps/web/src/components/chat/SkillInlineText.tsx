@@ -126,6 +126,7 @@ export function SkillChipPopover(props: {
   return (
     <ContextChipPopover
       kind="skill"
+      openOnHover
       icon={<SkillChipIcon />}
       label={props.label}
       accessibleLabel={`Skill ${props.label}`}

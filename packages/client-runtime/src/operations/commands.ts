@@ -61,12 +61,19 @@ export interface CreateProjectInput extends CommandMetadata {
   readonly scripts?: ReadonlyArray<ProjectScript>;
 }
 
+export interface CreateProductInput extends CommandMetadata {
+  readonly projectId: ProjectId;
+  readonly title: string;
+  readonly productProjectIds: ReadonlyArray<ProjectId>;
+}
+
 export interface UpdateProjectInput extends CommandMetadata {
   readonly projectId: ProjectId;
   readonly title?: string;
   readonly workspaceRoot?: string;
   readonly defaultModelSelection?: ModelSelection | null;
   readonly autoPull?: boolean;
+  readonly productProjectIds?: ReadonlyArray<ProjectId>;
   readonly projectIcon?: ProjectIconOverride | null;
   readonly faviconPath?: string | null;
   readonly defaultThreadEnvMode?: ThreadEnvMode | null;
@@ -145,6 +152,7 @@ export interface UpdateThreadMetadataInput extends ThreadCommandInput {
   readonly worktreePath?: string | null;
   readonly regenerateTitle?: boolean;
   readonly linkedPullRequest?: ThreadLinkedPullRequest | null;
+  /** Apply only while no message or run has landed on the thread. */
   readonly expectedEmpty?: boolean;
 }
 
@@ -401,6 +409,13 @@ const mutateProject = Effect.fn("EnvironmentCommands.mutateProject")(function* (
         readonly scripts?: ReadonlyArray<ProjectScript>;
       }
     | {
+        readonly type: "product.create";
+        readonly commandId: CommandId;
+        readonly projectId: ProjectId;
+        readonly title: string;
+        readonly productProjectIds: ReadonlyArray<ProjectId>;
+      }
+    | {
         readonly type: "project.delete";
         readonly commandId: CommandId;
         readonly projectId: ProjectId;
@@ -429,6 +444,18 @@ export const createProject = Effect.fn("EnvironmentCommands.createProject")(func
   });
 });
 
+export const createProduct = Effect.fn("EnvironmentCommands.createProduct")(function* (
+  input: CreateProductInput,
+) {
+  return yield* mutateProject({
+    type: "product.create",
+    commandId: yield* allocateCommandId(input),
+    projectId: input.projectId,
+    title: input.title,
+    productProjectIds: input.productProjectIds,
+  });
+});
+
 export const updateProject = Effect.fn("EnvironmentCommands.updateProject")(function* (
   input: UpdateProjectInput,
 ) {
@@ -442,6 +469,9 @@ export const updateProject = Effect.fn("EnvironmentCommands.updateProject")(func
       ? {}
       : { defaultModelSelection: input.defaultModelSelection }),
     ...(input.autoPull === undefined ? {} : { autoPull: input.autoPull }),
+    ...(input.productProjectIds === undefined
+      ? {}
+      : { productProjectIds: input.productProjectIds }),
     ...(input.projectIcon === undefined ? {} : { projectIcon: input.projectIcon }),
     ...(input.faviconPath === undefined ? {} : { faviconPath: input.faviconPath }),
     ...(input.defaultThreadEnvMode === undefined

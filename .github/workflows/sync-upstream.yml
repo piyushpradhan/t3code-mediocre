@@ -1,0 +1,178 @@
+name: Sync upstream main
+
+# Fork-only. Merges pingdotgg/t3code main into this fork's main.
+# Merge (never rebase) so main is never force-pushed and local clones just `git pull`.
+# On conflict, Codex resolves the merge and repairs typecheck failures before landing on main.
+# Otherwise pushes upstream main to `sync/upstream` and opens a PR to resolve by hand.
+# Any change to main triggers a fork release.
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Merge pingdotgg/t3code main
+    if: github.repository != 'pingdotgg/t3code'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          # GITHUB_TOKEN cannot push commits that touch .github/workflows, and upstream
+          # edits them often. SYNC_TOKEN: fine-grained PAT with Contents, Workflows and
+          # Pull requests and Secrets read/write on this repo.
+          token: ${{ secrets.SYNC_TOKEN || github.token }}
+
+      - name: Test typecheck recovery
+        run: |
+          python3 -B .github/scripts/repair-upstream-typecheck.test.py
+          python3 -B .github/scripts/sync-upstream-auth.test.py
+
+      - id: merge
+        name: Merge upstream
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch https://github.com/pingdotgg/t3code.git main:refs/remotes/upstream/main
+
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "Already up to date."
+            echo "result=current" >> "$GITHUB_OUTPUT"
+          elif git merge --no-edit upstream/main; then
+            echo "result=clean" >> "$GITHUB_OUTPUT"
+          else
+            # Leave the merge in progress for Codex.
+            echo "result=conflict" >> "$GITHUB_OUTPUT"
+          fi
+
+      - id: auth
+        name: Restore Codex login
+        if: steps.merge.outputs.result == 'conflict'
+        env:
+          CODEX_HOME: ${{ runner.temp }}/sync-upstream-codex
+          # Use a dedicated login; sharing it with another machine races token rotation.
+          CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+        run: |
+          bash .github/scripts/sync-upstream-auth.sh prepare
+          echo "CODEX_HOME=$CODEX_HOME" >> "$GITHUB_ENV"
+
+      - name: Resolve conflicts with Codex
+        if: steps.merge.outputs.result == 'conflict'
+        timeout-minutes: 30
+        env:
+          MODEL: ${{ vars.SYNC_RESOLVE_MODEL || 'gpt-6-luna' }}
+          PROMPT: |
+            A `git merge upstream/main` is in progress in this repository and has conflicts.
+            HEAD is this fork's main (fork-only customizations); upstream/main is pingdotgg/t3code.
+            Run `git diff --name-only --diff-filter=U` to list conflicted files, then resolve every
+            conflict by keeping upstream's changes AND preserving the fork's intent. Read both sides
+            (`git log --oneline -5 HEAD -- <file>` and `git log --oneline -5 upstream/main -- <file>`)
+            before editing. Remove all conflict markers and `git add` each resolved file.
+            Do not commit, do not push, do not touch files that are not conflicted.
+        run: |
+          # Lockfile conflicts are not hand-mergeable; take upstream's.
+          if git diff --name-only --diff-filter=U | grep -qx pnpm-lock.yaml; then
+            git checkout --theirs pnpm-lock.yaml && git add pnpm-lock.yaml
+          fi
+          npx -y @openai/codex@latest exec --dangerously-bypass-approvals-and-sandbox \
+            -m "$MODEL" -c model_reasoning_effort=medium "$PROMPT"
+          if [ -n "$(git diff --name-only --diff-filter=U)" ] || git grep -qE '^(<<<<<<<|>>>>>>>) ' -- .; then
+            echo "::error::Conflicts remain after Codex."
+            exit 1
+          fi
+
+      - name: Setup Vite+
+        if: steps.merge.outputs.result == 'conflict'
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: false
+
+      - name: Reconcile lockfile and install dependencies
+        if: steps.merge.outputs.result == 'conflict'
+        run: |
+          # The upstream lockfile can omit dependencies kept in the fork's manifests.
+          vp install --lockfile-only --no-frozen-lockfile --ignore-scripts
+          vp install --frozen-lockfile
+          git add pnpm-lock.yaml
+
+      # ponytail: typecheck only. CI on main runs the full suite after push.
+      - id: typecheck
+        name: Typecheck resolution
+        if: steps.merge.outputs.result == 'conflict'
+        continue-on-error: true
+        shell: bash
+        run: vpr typecheck 2>&1 | tee "$RUNNER_TEMP/sync-upstream-typecheck.log"
+
+      - name: Fix typecheck failures with Codex
+        if: steps.typecheck.outcome == 'failure'
+        timeout-minutes: 60
+        env:
+          MODEL: ${{ vars.SYNC_REPAIR_MODEL || 'gpt-6.1-sol' }}
+          PROMPT: |
+            A `git merge upstream/main` is in progress. Conflicts have been resolved, but
+            `vpr typecheck` failed. Read the diagnostics in
+            $RUNNER_TEMP/sync-upstream-typecheck.log (expand RUNNER_TEMP from the environment).
+            HEAD is this fork's main; upstream/main is pingdotgg/t3code.
+            Fix the type errors while preserving upstream changes AND the fork's intent.
+            You may edit files beyond the originally conflicted files when needed to fix
+            integration errors. Keep changes focused; do not disable checks, weaken types,
+            or remove functionality to make the check pass. Run `vpr typecheck` and iterate
+            until it succeeds. Stage all repaired files with `git add`.
+            Do not commit, push, abort the merge, or change workflow files.
+        run: bash .github/scripts/repair-upstream-typecheck.sh
+
+      - name: Verify repaired resolution
+        if: steps.typecheck.outcome == 'failure'
+        run: |
+          if [ -n "$(git diff --name-only --diff-filter=U)" ] || git grep -qE '^(<<<<<<<|>>>>>>>) ' -- .; then
+            echo "::error::Conflicts remain after typecheck repair."
+            exit 1
+          fi
+          vpr typecheck
+          git add -u
+
+      - name: Preserve refreshed Codex login
+        if: always() && steps.auth.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+        run: bash .github/scripts/sync-upstream-auth.sh save
+
+      - name: Push main and release
+        if: steps.merge.outputs.result == 'clean' || steps.merge.outputs.result == 'conflict'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ steps.merge.outputs.result }}" = conflict ]; then
+            git commit --no-edit --no-verify
+          fi
+          git push origin main
+          gh workflow run release-fork.yml --ref main
+
+      - name: Open PR for manual resolution
+        if: failure() && steps.merge.outputs.result == 'conflict'
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
+        run: |
+          git push --force origin upstream/main:refs/heads/sync/upstream
+          if [ -z "$(gh pr list --head sync/upstream --state open --json number -q '.[].number')" ]; then
+            gh pr create --base main --head sync/upstream \
+              --title "chore: merge upstream pingdotgg/t3code" \
+              --body "Automatic upstream merge failed during conflict resolution, typecheck repair, or publishing. Resolve locally: \`git fetch upstream && git merge upstream/main\`, fix conflicts and typecheck errors, push main. This PR closes itself once merged."
+          fi
+          echo "::warning::Upstream merge conflicted; see sync/upstream PR."

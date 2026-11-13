@@ -3233,6 +3233,12 @@ describe("OpenCodeAdapterV2", () => {
     const autoAcceptEdits = openCodePermissionRules(runtimePolicy("auto-accept-edits"));
     assert.equal(permissionAction(autoAcceptEdits, "edit"), "allow");
     assert.equal(permissionAction(autoAcceptEdits, "bash"), "ask");
+    assert.deepInclude(
+      openCodePermissionRules(
+        runtimePolicy("auto-accept-edits", { additionalDirectories: ["/product/lib/"] }),
+      ),
+      { permission: "external_directory", pattern: "/product/lib/*", action: "allow" },
+    );
 
     const fullAccess = openCodePermissionRules(runtimePolicy("full-access"));
     assert.equal(permissionAction(fullAccess, "bash"), "allow");

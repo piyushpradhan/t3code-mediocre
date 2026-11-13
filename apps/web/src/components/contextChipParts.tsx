@@ -67,6 +67,7 @@ export function ContextChipPopover(props: {
   label: string;
   copyMarkdown?: string | undefined;
   accessibleLabel: string;
+  openOnHover?: boolean;
   /** Overrides the kind's accent color. */
   accent?: string | undefined;
   children: ReactNode;
@@ -74,6 +75,7 @@ export function ContextChipPopover(props: {
   return (
     <Popover>
       <PopoverTrigger
+        openOnHover={props.openOnHover}
         render={
           <ContextChip
             kind={props.kind}

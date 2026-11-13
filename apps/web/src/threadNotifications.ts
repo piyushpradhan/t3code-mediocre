@@ -112,6 +112,11 @@ export function unlockNotificationAudio() {
   }
 }
 
+/** The context a gesture unlocked, for audio that plays without one. */
+export function unlockedAudioContext(): AudioContext | undefined {
+  return audioContext?.state === "running" ? audioContext : undefined;
+}
+
 export async function playNotificationSound(
   kind: "completion" | "input",
   shouldPlay: () => boolean,

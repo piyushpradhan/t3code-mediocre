@@ -81,7 +81,9 @@ function startWithMissingWorktree(
     [managedWorktreesDir]: managedWorktreesDir,
     [`${managedWorktreesDir}/project`]: `${managedWorktreesDir}/project`,
   },
+  productMemberRoot?: string,
 ) {
+  const memberId = ProjectId.make("project_provider_turn_start_product_member");
   const threadId = ThreadId.make("thread_provider_turn_start_projection_failure");
   const runId = RunId.make("run_provider_turn_start_projection_failure");
   const attemptId = RunAttemptId.make("attempt_provider_turn_start_projection_failure");
@@ -140,7 +142,17 @@ function startWithMissingWorktree(
         IdAllocator.layer,
         Layer.mock(TurnItemPositionStore.TurnItemPositionStoreV2)({}),
         Layer.succeed(FileSystem.FileSystem, {
-          exists: () => Effect.succeed(false),
+          exists: (target: string) => Effect.succeed(target === `${productMemberRoot}/.git`),
+          makeDirectory: () => Effect.void,
+          readLink: (target: string) =>
+            Effect.fail(
+              PlatformError.systemError({
+                _tag: "NotFound",
+                module: "FileSystem",
+                method: "readLink",
+                pathOrDescriptor: target,
+              }),
+            ),
           realPath: (target: string) =>
             normalize(target) in realPaths
               ? Effect.succeed(realPaths[normalize(target)])
@@ -160,8 +172,15 @@ function startWithMissingWorktree(
           listLocalBranchNames,
         }),
         Layer.mock(ProjectService.ProjectService)({
-          getById: () =>
-            Effect.succeedSome({ workspaceRoot: "/tmp/provider-turn-start-project" } as never),
+          getById: (projectId) =>
+            Effect.succeedSome(
+              (projectId === memberId
+                ? { workspaceRoot: productMemberRoot }
+                : {
+                    workspaceRoot: "/tmp/provider-turn-start-project",
+                    productProjectIds: productMemberRoot === undefined ? null : [memberId],
+                  }) as never,
+            ),
         }),
         Layer.mock(ProjectionStore.ProjectionStoreV2)({
           getThreadRecords: () => {
@@ -267,6 +286,21 @@ it.each([
   const harness = startWithMissingWorktree(input.worktreePath, input.realPaths);
   await harness.start;
   expect(harness.createWorktree).toHaveBeenCalledTimes(input.recreated ? 1 : 0);
+});
+
+it("fills a product thread's folder with a worktree of each Git member", async () => {
+  const harness = startWithMissingWorktree(
+    `${managedWorktreesDir}/project/feature-restore`,
+    undefined,
+    "/tmp/provider-turn-start-lib",
+  );
+  await harness.start;
+  expect(harness.createWorktree).toHaveBeenCalledOnce();
+  expect(harness.createWorktree).toHaveBeenCalledWith({
+    cwd: "/tmp/provider-turn-start-lib",
+    refName: "feature/restore",
+    path: `${managedWorktreesDir}/project/feature-restore/provider-turn-start-lib`,
+  });
 });
 
 function makeLocalCommandHarness(input: {

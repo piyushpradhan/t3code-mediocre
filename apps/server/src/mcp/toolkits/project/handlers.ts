@@ -338,9 +338,25 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
     }),
   ),
   t3_project_create: McpToolAccess.writesEnvironment(
-    ({ workspaceRoot, ...input }) =>
+    ({ workspaceRoot, productProjectIds, ...input }) =>
       Effect.gen(function* () {
         const projects = yield* Project.ProjectService;
+        if (productProjectIds !== undefined) {
+          if (workspaceRoot !== undefined || input.scripts !== undefined)
+            return yield* new OrchestratorMcpFailure({
+              code: "invalid_request",
+              message: "A product takes a title and productProjectIds; T3 Code picks its folder.",
+            });
+          const commandId = yield* newCommandId();
+          return yield* projects
+            .createProduct({
+              commandId,
+              projectId: ProjectId.make(commandId),
+              title: input.title,
+              productProjectIds,
+            })
+            .pipe(Effect.mapError(projectFailure));
+        }
         if (workspaceRoot === undefined) {
           // Only updates record model defaults; reject defaults that creation would silently drop.
           if (

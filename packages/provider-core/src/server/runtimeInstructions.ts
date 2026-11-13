@@ -11,6 +11,8 @@ export function buildRuntimeInstructions(runtime: {
   readonly reasoningEffort?: string | undefined;
   /** False when the session's system prompt already carries the linking instructions. */
   readonly pullRequestLinking?: boolean;
+  /** The thread's other product folders, from the runtime policy's `additionalDirectories`. */
+  readonly productDirectories?: ReadonlyArray<string> | undefined;
 }): string {
   const harness = toSingleLine(runtime.harness);
   const model = toSingleLine(runtime.model ?? "");
@@ -21,9 +23,20 @@ export function buildRuntimeInstructions(runtime: {
   const modelInfo = model && model !== "auto" && model !== "default" ? `, as ${modelLabel}` : "";
   const effortInfo = effort ? ` with ${effort} reasoning effort` : "";
   const runtimeInfo = `<runtime_info>In case you're asked: you are running in T3 Code through the ${harness} harness${modelInfo}${effortInfo}. No need to mention this otherwise. You can embed images, video, and audio using Markdown image syntax with absolute file paths. Link every other file you cite or produce by its absolute path, as in [http.ts:42](/abs/path/http.ts:42), so the user can open it in T3 Code's files viewer.</runtime_info>`;
+  const productFolders = buildProductFoldersInstructions(runtime.productDirectories);
+  const productInfo = productFolders === "" ? "" : `\n\n${productFolders}`;
   return runtime.pullRequestLinking === false
-    ? runtimeInfo
-    : `${runtimeInfo}\n\n${PULL_REQUEST_LINKING_INSTRUCTIONS}`;
+    ? runtimeInfo + productInfo
+    : `${runtimeInfo}${productInfo}\n\n${PULL_REQUEST_LINKING_INSTRUCTIONS}`;
+}
+
+/** Empty when the thread's project is not part of a product. */
+export function buildProductFoldersInstructions(
+  directories: ReadonlyArray<string> | undefined,
+): string {
+  if (directories === undefined || directories.length === 0) return "";
+  const list = directories.map((directory) => `- ${toSingleLine(directory)}`).join("\n");
+  return `<product_folders>\nThis thread works in a product. Its working directory links to these project folders; read and change them as part of the workspace:\n${list}\n</product_folders>`;
 }
 
 function toSingleLine(value: string): string {

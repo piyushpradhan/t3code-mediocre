@@ -142,6 +142,24 @@ word or phrase you say to flag a correction, such as "scratch that". Cleanup
 applies the correction only where the context shows one and drops the cue, and
 the model hears the cue as a dictionary hint.
 
+## Hear replies
+
+To talk with an agent hands-free, dictate your message and have the reply read
+back. In **Settings → Voice → Spoken replies**, turn on **Read replies aloud**.
+When the thread you have open finishes a run, this device plays the reply. Code
+blocks, tables, and link addresses are skipped, and a long reply is read up to
+about a minute. Starting a new dictation, or **Stop** on the notice that shows
+while audio plays, ends playback. The switch is saved on this device only.
+
+Speech comes from a server you choose, set per environment under **Speech
+server**. Any server with an OpenAI-compatible speech API works: a local
+[Kokoro](https://github.com/remsky/Kokoro-FastAPI) or Piper server on the
+environment's machine, or a hosted one. Enter its URL up to the version segment,
+such as `http://localhost:8880/v1`, then the model and voice names that server
+uses, and an API key if it needs one. **Test voice** plays a sample. The
+environment sends the reply text to that server, so a hosted server sees what
+your agents write.
+
 ## Test and troubleshoot
 
 In **Settings → Voice**, voice input uses the first connected microphone in the

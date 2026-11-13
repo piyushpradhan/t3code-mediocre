@@ -195,6 +195,7 @@ describe("CodexAdapterV2 runtime policy", () => {
     Effect.gen(function* () {
       const build = (
         runtimeMode: "approval-required" | "auto-accept-edits" | "auto" | "full-access",
+        additionalDirectories?: ReadonlyArray<string>,
       ) =>
         CodexAdapterV2.buildCodexTurnStartParams({
           nativeThreadId: `native-${runtimeMode}`,
@@ -203,6 +204,7 @@ describe("CodexAdapterV2 runtime policy", () => {
             runtimeMode,
             interactionMode: "default",
             cwd: null,
+            ...(additionalDirectories === undefined ? {} : { additionalDirectories }),
           },
           modelSelection: {
             instanceId: ProviderInstanceId.make("codex"),
@@ -227,6 +229,17 @@ describe("CodexAdapterV2 runtime policy", () => {
       assert.equal(fullAccess.approvalPolicy, "never");
       assert.equal(fullAccess.approvalsReviewer, "user");
       assert.equal(fullAccess.sandboxPolicy?.type, "dangerFullAccess");
+
+      const product = yield* build("auto-accept-edits", ["/product/lib"]);
+      assert.deepEqual(product.sandboxPolicy, {
+        type: "workspaceWrite",
+        writableRoots: ["/product/lib"],
+      });
+      assert.include(product.additionalContext?.["t3_code_product_folders"]?.value, "/product/lib");
+      assert.equal(
+        (yield* build("full-access", ["/product/lib"])).sandboxPolicy?.type,
+        "dangerFullAccess",
+      );
     }),
   );
 

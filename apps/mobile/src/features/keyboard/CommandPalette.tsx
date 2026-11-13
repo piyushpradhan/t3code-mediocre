@@ -305,6 +305,13 @@ export function CommandPalette(props: {
         run: () => navigation.navigate("AddProject"),
       },
       {
+        key: "addProduct",
+        kind: "action",
+        title: "Add product",
+        searchTerms: ["group", "projects", "repositories", "multi repo"],
+        run: () => navigation.navigate("AddProduct"),
+      },
+      {
         key: "settings",
         kind: "action",
         title: "Open settings",
@@ -410,8 +417,12 @@ export function CommandPalette(props: {
       kind: "project",
       project,
       title: project.title,
-      detail: `New thread · ${savedConnectionsById[project.environmentId]?.environmentLabel ?? project.environmentId}`,
-      searchTerms: [project.workspaceRoot, "new thread", "project"],
+      detail: `${project.productProjectIds != null ? "New thread in product" : "New thread"} · ${savedConnectionsById[project.environmentId]?.environmentLabel ?? project.environmentId}`,
+      searchTerms: [
+        project.workspaceRoot,
+        "new thread",
+        project.productProjectIds != null ? "product" : "project",
+      ],
       run: () =>
         selectDetail({
           name: "Thread",

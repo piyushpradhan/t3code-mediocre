@@ -600,6 +600,20 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["voice speech vad silero pauses noise"],
   },
   {
+    id: "speak-replies",
+    title: "Read replies aloud",
+    to: "/settings/voice",
+    searchTerms: ["voice speech tts text to speech spoken talk listen hear agent response audio"],
+  },
+  {
+    id: "speech-synthesis-server",
+    title: "Speech server",
+    to: "/settings/voice",
+    searchTerms: [
+      "voice tts text to speech model runtime endpoint url api key OpenAI compatible Kokoro Piper local",
+    ],
+  },
+  {
     id: "remove-filler-words",
     title: "Remove filler words",
     to: "/settings/voice",

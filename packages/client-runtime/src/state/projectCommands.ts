@@ -26,7 +26,12 @@ import {
   createEnvironmentRpcCommand,
   createEnvironmentRpcQueryAtomFamily,
 } from "./runtime.ts";
-import { createProject, deleteProject, updateProject } from "../operations/commands.ts";
+import {
+  createProduct,
+  createProject,
+  deleteProject,
+  updateProject,
+} from "../operations/commands.ts";
 import type { EnvironmentRegistry } from "../connection/registry.ts";
 import { createFileMetadataAtoms } from "./fileMetadata.ts";
 import { resolveWorkspaceFilePath } from "@t3tools/shared/path";
@@ -152,6 +157,12 @@ export function createProjectEnvironmentAtoms<R, E>(
     create: createEnvironmentCommand(runtime, {
       label: "environment-data:commands:project:create",
       execute: createProject,
+      scheduler: projectScheduler,
+      concurrency: projectConcurrency,
+    }),
+    createProduct: createEnvironmentCommand(runtime, {
+      label: "environment-data:commands:product:create",
+      execute: createProduct,
       scheduler: projectScheduler,
       concurrency: projectConcurrency,
     }),

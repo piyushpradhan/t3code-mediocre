@@ -107,6 +107,7 @@ import * as PortScanner from "../../preview/PortScanner.ts";
 import { getCodexServiceTierOptionValue } from "../../codexModelOptions.ts";
 import { ServerConfig } from "../../config.ts";
 import { expandHomePath } from "@t3tools/provider-core/server/pathExpansion";
+import { buildProductFoldersInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
 import { buildCodexAdditionalContext } from "../../provider/CodexDeveloperInstructions.ts";
 import {
   describeMcpElicitation,
@@ -790,10 +791,19 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
       input.runtimePolicy.approvalPolicy === undefined
         ? runtimeModeDefaults.approvalPolicy
         : yield* decodeTurnApprovalPolicy(input.runtimePolicy.approvalPolicy);
-    const sandboxPolicy =
+    const requestedSandboxPolicy =
       input.runtimePolicy.sandboxPolicy === undefined
         ? runtimeModeDefaults.sandboxPolicy
         : yield* decodeTurnSandboxPolicy(input.runtimePolicy.sandboxPolicy);
+    const productDirectories = input.runtimePolicy.additionalDirectories ?? [];
+    const sandboxPolicy =
+      productDirectories.length > 0 && requestedSandboxPolicy?.type === "workspaceWrite"
+        ? {
+            ...requestedSandboxPolicy,
+            writableRoots: [...(requestedSandboxPolicy.writableRoots ?? []), ...productDirectories],
+          }
+        : requestedSandboxPolicy;
+    const productFolders = buildProductFoldersInstructions(productDirectories);
     const selectedEffort =
       getModelSelectionStringOptionValue(input.modelSelection, "reasoningEffort") ??
       codexDefaultReasoningEffortOverride(input.modelSelection.model);
@@ -821,9 +831,17 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
           )
         : undefined;
     const additionalContext =
-      t3Context === undefined && Object.keys(appContext).length === 0
+      t3Context === undefined && Object.keys(appContext).length === 0 && productFolders === ""
         ? undefined
-        : { ...t3Context, ...appContext };
+        : {
+            ...t3Context,
+            ...(productFolders === ""
+              ? {}
+              : {
+                  t3_code_product_folders: { kind: "application" as const, value: productFolders },
+                }),
+            ...appContext,
+          };
     return yield* decodeCodexTurnStartParamsWithCollaborationMode({
       threadId: input.nativeThreadId,
       input: input.codexInput,

@@ -683,6 +683,15 @@ export function openCodePermissionRules(
     }
   }
 
+  // Product folders count as the workspace; edits in them still follow the edit rules above.
+  for (const directory of runtimePolicy.additionalDirectories ?? []) {
+    rules.push({
+      permission: "external_directory",
+      pattern: `${directory.replace(/\/$/, "")}/*`,
+      action: "allow",
+    });
+  }
+
   return rules;
 }
 
@@ -2989,7 +2998,11 @@ export const makeOpenCodeAdapterV2 = Effect.fn("makeOpenCodeAdapterV2")(function
             ...(variant === undefined ? {} : { variant }),
             system: [
               orchestrationSystemPrompt,
-              buildRuntimeInstructions({ harness: "OpenCode", model: turn.modelSelection.model }),
+              buildRuntimeInstructions({
+                harness: "OpenCode",
+                model: turn.modelSelection.model,
+                productDirectories: turn.runtimePolicy.additionalDirectories,
+              }),
             ]
               .filter(Boolean)
               .join("\n\n"),

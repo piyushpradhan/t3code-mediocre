@@ -2,6 +2,7 @@ import {
   CLOUD_SPEECH_PROVIDER_NAMES,
   type CloudSpeechProvider,
   SPEECH_MAX_OPTIONS_BYTES,
+  SPEECH_SYNTHESIS_MAX_CHARS,
   type SpeechCustomWords,
   SpeechTranscriptionOptions,
 } from "@t3tools/contracts";
@@ -136,4 +137,28 @@ export function decodeSpeechPcmRequest(body: Uint8Array) {
     new TextDecoder("utf-8", { fatal: true }).decode(body.subarray(4, 4 + length)),
   );
   return { pcm: body.subarray(4 + length), options };
+}
+
+/**
+ * The prose of a markdown reply, for reading aloud: code blocks, tables, and link targets are
+ * dropped, and a long reply ends at the last sentence that fits.
+ */
+// ponytail: reads the opening of a long reply; summarize with the text generation model if that proves too blunt.
+export function speakableText(markdown: string, maxChars = SPEECH_SYNTHESIS_MAX_CHARS): string {
+  const prose = markdown
+    .replace(/^(```|~~~)[^\n]*\n[\s\S]*?^\1[ \t]*$/gm, " ")
+    .replace(/^\s*\|.*\|\s*$/gm, " ")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+[.)])\s+/gm, "")
+    .replace(/`|\*+|~~/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (prose.length <= maxChars) return prose;
+  const head = prose.slice(0, maxChars);
+  const sentenceEnd = Math.max(...[". ", "? ", "! "].map((mark) => head.lastIndexOf(mark)));
+  if (sentenceEnd > 0) return head.slice(0, sentenceEnd + 1);
+  const wordEnd = head.lastIndexOf(" ");
+  return wordEnd > 0 ? head.slice(0, wordEnd) : head;
 }

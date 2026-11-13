@@ -23,6 +23,7 @@ export interface ProjectCreateCommand {
   readonly title: string;
   readonly workspaceRoot: string;
   readonly scripts?: ReadonlyArray<ProjectScript>;
+  readonly productProjectIds?: ReadonlyArray<ProjectId>;
 }
 
 export interface ProjectMetaUpdateCommand {
@@ -34,6 +35,7 @@ export interface ProjectMetaUpdateCommand {
   readonly defaultModelSelection?: ModelSelection | null;
   readonly defaultThreadEnvMode?: ThreadEnvMode | null;
   readonly autoPull?: boolean;
+  readonly productProjectIds?: ReadonlyArray<ProjectId>;
   readonly faviconPath?: string | null;
   readonly projectIcon?: ProjectIconOverride | null;
   readonly scripts?: ReadonlyArray<ProjectScript>;
@@ -162,6 +164,9 @@ export function planProjectCommand(input: {
           defaultModelSelection: null,
           faviconPath: null,
           projectIcon: null,
+          ...(command.productProjectIds === undefined
+            ? {}
+            : { productProjectIds: command.productProjectIds }),
           scripts: command.scripts ?? [],
           createdAt: occurredAt,
           updatedAt: occurredAt,
@@ -207,6 +212,9 @@ export function planProjectCommand(input: {
             ? {}
             : { defaultThreadEnvMode: command.defaultThreadEnvMode }),
           ...(command.autoPull === undefined ? {} : { autoPull: command.autoPull }),
+          ...(command.productProjectIds === undefined
+            ? {}
+            : { productProjectIds: command.productProjectIds }),
           ...(command.faviconPath === undefined ? {} : { faviconPath: command.faviconPath }),
           ...(command.projectIcon === undefined ? {} : { projectIcon: command.projectIcon }),
           ...(command.scripts === undefined ? {} : { scripts: command.scripts }),
