@@ -1433,6 +1433,7 @@ export default function FilePreviewPanel({
             wordWrap={wordWrap}
             onPostRender={onFilePostRender}
             onPendingChange={onPendingChange}
+            onEditorChange={handleEditorChangeStable}
           />
         </DiffWorkerPoolProvider>
       )
