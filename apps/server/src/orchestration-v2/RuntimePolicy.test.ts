@@ -122,6 +122,7 @@ const projectRow = (overrides: Partial<ProjectStore.ProjectRow>): ProjectStore.P
   workspaceRoot: "/project-root",
   defaultModelSelection: null,
   defaultThreadEnvMode: null,
+  hasCustomTitle: false,
   autoPull: false,
   productProjectIds: null,
   faviconPath: null,
