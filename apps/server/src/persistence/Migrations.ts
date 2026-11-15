@@ -99,7 +99,11 @@ import Migration0088 from "./Migrations/088_TurnItemTypeStatusIndex.ts";
 import Migration0089 from "./Migrations/089_ShellThreadReadIndexes.ts";
 import Migration0090 from "./Migrations/090_AuthConnectDevices.ts";
 import Migration0091 from "./Migrations/091_AuthConnectDeniedRequests.ts";
-import Migration0092 from "./Migrations/092_ProjectionProjectsProductMembers.ts";
+import Migration0092 from "./Migrations/092_QueuedTurnInputIndexJsonValid.ts";
+import Migration0093 from "./Migrations/093_ProviderTurnAttemptIndex.ts";
+import Migration0094 from "./Migrations/094_TurnItemMessageOrdinalIndex.ts";
+import Migration0095 from "./Migrations/095_TurnItemInlineWorkOutput.ts";
+import Migration0096 from "./Migrations/096_ProjectionProjectsProductMembers.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -194,7 +198,11 @@ const migrationEntries = [
   [89, "ShellThreadReadIndexes", Migration0089],
   [90, "AuthConnectDevices", Migration0090],
   [91, "AuthConnectDeniedRequests", Migration0091],
-  [92, "ProjectionProjectsProductMembers", Migration0092],
+  [92, "QueuedTurnInputIndexJsonValid", Migration0092],
+  [93, "ProviderTurnAttemptIndex", Migration0093],
+  [94, "TurnItemMessageOrdinalIndex", Migration0094],
+  [95, "TurnItemInlineWorkOutput", Migration0095],
+  [96, "ProjectionProjectsProductMembers", Migration0096],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
@@ -278,7 +286,7 @@ export interface RunMigrationsOptions {
   readonly toMigrationInclusive?: number | undefined;
 }
 
-// Release the fork's former note migration id, which upstream now uses for OrchestrationV2.
+// Release ids the fork used before upstream claimed them.
 const releaseForkMigrationIds = Effect.fn("releaseForkMigrationIds")(function* () {
   const sql = yield* SqlClient.SqlClient;
   const tables = yield* sql`
@@ -286,7 +294,7 @@ const releaseForkMigrationIds = Effect.fn("releaseForkMigrationIds")(function* (
     `;
   if (tables.length === 0) return;
   yield* sql`DELETE FROM effect_sql_migrations WHERE migration_id = 55 AND name = 'ProjectionThreadNote'`;
-  yield* sql`DELETE FROM effect_sql_migrations WHERE migration_id = 86 AND name = 'ProjectionProjectsProductMembers'`;
+  yield* sql`DELETE FROM effect_sql_migrations WHERE migration_id IN (86, 92) AND name = 'ProjectionProjectsProductMembers'`;
 });
 
 /** Runs pending migrations; returns the [id, name] tuples that ran. */
