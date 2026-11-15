@@ -11,7 +11,7 @@ SCRIPT = Path(os.environ.get(
 
 
 class RepairUpstreamTypecheckTests(unittest.TestCase):
-    def run_repair(self, fix_on=2, codex_exit=0, conflict=False):
+    def run_repair(self, fix_on=2, agent_exit=0, conflict=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             repo = root / "repo"
@@ -20,15 +20,10 @@ class RepairUpstreamTypecheckTests(unittest.TestCase):
             tools.mkdir()
             temp = root / "temp"
             temp.mkdir()
-            codex_home = root / ".codex"
-            codex_home.mkdir()
-            auth = codex_home / "auth.json"
-            auth.write_text('{"tokens":{"refresh_token":"rotated"}}')
             env = dict(os.environ, PATH=f"{tools}:{os.environ['PATH']}",
                        HOME=str(root), RUNNER_TEMP=str(temp), MODEL="fixture",
-                       CODEX_HOME=str(codex_home),
-                       PROMPT="Repair typecheck", CODEX_AUTH_JSON="{}",
-                       FIX_ON=str(fix_on), CODEX_EXIT=str(codex_exit),
+                       PROMPT="Repair typecheck",
+                       FIX_ON=str(fix_on), AGENT_EXIT=str(agent_exit),
                        CONFLICT="1" if conflict else "0")
 
             def git(*args):
@@ -60,7 +55,7 @@ if [ "$count" -ge "$FIX_ON" ]; then
   if [ "$CONFLICT" = 1 ]; then echo '<<<<<<< unresolved' >> source.ts; fi
 fi
 # Like the failed run, an unfinished agent can exit zero.
-exit "$CODEX_EXIT"
+exit "$AGENT_EXIT"
 ''',
                 "vpr": '''#!/bin/bash
 if grep -q '^fixed' source.ts; then exit 0; fi
@@ -76,10 +71,9 @@ exit 2
                                     cwd=repo, env=env, text=True, capture_output=True, timeout=10)
             attempts = int((temp / "attempts").read_text())
             self.assertEqual(git("rev-parse", "HEAD"), before)
-            self.assertEqual(auth.read_text(), '{"tokens":{"refresh_token":"rotated"}}')
             return result, attempts, git("diff", "--cached", "--name-only")
 
-    def test_retries_successful_codex_exit_when_typecheck_still_fails(self):
+    def test_retries_successful_agent_exit_when_typecheck_still_fails(self):
         result, attempts, staged = self.run_repair()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(attempts, 2)
@@ -91,13 +85,13 @@ exit 2
         self.assertEqual(attempts, 3)
         self.assertEqual(staged, "")
 
-    def test_retries_codex_process_failure(self):
-        result, attempts, _ = self.run_repair(codex_exit=1)
+    def test_retries_agent_process_failure(self):
+        result, attempts, _ = self.run_repair(agent_exit=1)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(attempts, 2)
 
-    def test_retries_timed_out_codex(self):
-        result, attempts, _ = self.run_repair(codex_exit=124)
+    def test_retries_timed_out_agent(self):
+        result, attempts, _ = self.run_repair(agent_exit=124)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(attempts, 2)
 
