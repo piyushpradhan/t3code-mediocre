@@ -103,7 +103,8 @@ import Migration0092 from "./Migrations/092_QueuedTurnInputIndexJsonValid.ts";
 import Migration0093 from "./Migrations/093_ProviderTurnAttemptIndex.ts";
 import Migration0094 from "./Migrations/094_TurnItemMessageOrdinalIndex.ts";
 import Migration0095 from "./Migrations/095_TurnItemInlineWorkOutput.ts";
-import Migration0096 from "./Migrations/096_ProjectionProjectsProductMembers.ts";
+import Migration0096 from "./Migrations/096_RepairStaleTitleRegeneration.ts";
+import Migration0097 from "./Migrations/097_ProjectionProjectsProductMembers.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -202,7 +203,8 @@ const migrationEntries = [
   [93, "ProviderTurnAttemptIndex", Migration0093],
   [94, "TurnItemMessageOrdinalIndex", Migration0094],
   [95, "TurnItemInlineWorkOutput", Migration0095],
-  [96, "ProjectionProjectsProductMembers", Migration0096],
+  [96, "RepairStaleTitleRegeneration", Migration0096],
+  [97, "ProjectionProjectsProductMembers", Migration0097],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
@@ -294,7 +296,7 @@ const releaseForkMigrationIds = Effect.fn("releaseForkMigrationIds")(function* (
     `;
   if (tables.length === 0) return;
   yield* sql`DELETE FROM effect_sql_migrations WHERE migration_id = 55 AND name = 'ProjectionThreadNote'`;
-  yield* sql`DELETE FROM effect_sql_migrations WHERE migration_id IN (86, 92) AND name = 'ProjectionProjectsProductMembers'`;
+  yield* sql`DELETE FROM effect_sql_migrations WHERE migration_id IN (86, 92, 96) AND name = 'ProjectionProjectsProductMembers'`;
 });
 
 /** Runs pending migrations; returns the [id, name] tuples that ran. */
