@@ -18,6 +18,7 @@ import * as ServerSettings from "../serverSettings.ts";
 
 type Reason = SpeechSynthesisError["reason"];
 const fail = (reason: Reason) => new SpeechSynthesisError({ reason });
+const RUN_BRIEF_MAX_CHARS = 240;
 
 export class SpeechSynthesis extends Context.Service<
   SpeechSynthesis,
@@ -55,7 +56,8 @@ export const layer = Layer.effect(
                 messageRunIds: [request.runId],
               })).messages.findLast((message) => !message.workflowScript && message.text.trim())
                 ?.text ?? "");
-        const input = speakableText(text);
+        // ponytail: a run reply is briefed as its opening ~2 sentences; summarize with a model if openings prove unhelpful.
+        const input = speakableText(text, "text" in request ? undefined : RUN_BRIEF_MAX_CHARS);
         if (!input) return yield* fail("nothing-to-say");
         const source = cloudSpeechCredentials.synthesis;
         // A vault that locked since the last reply must not authorize sending this one.

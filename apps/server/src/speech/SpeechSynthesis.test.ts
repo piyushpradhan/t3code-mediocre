@@ -14,7 +14,7 @@ it.effect("speaks a run's last reply through the configured server only", () => 
     Effect.succeed({
       messages: [
         { text: "Looking into it." },
-        { text: "Fixed `auth.ts`.\n```ts\nconst secret = 1;\n```" },
+        { text: `Fixed \`auth.ts\`. ${"x".repeat(300)}.\n\`\`\`ts\nconst secret = 1;\n\`\`\`` },
         { text: "  " },
       ],
     }),

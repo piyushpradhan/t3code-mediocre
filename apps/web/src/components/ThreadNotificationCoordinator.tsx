@@ -143,13 +143,7 @@ export function startThreadNotifications(
     const { notificationMode: mode, inAppNotificationsEnabled, speakReplies } = getClientSettings();
     const active = activeThread();
     const runId = thread.latestRun?.runId;
-    if (
-      speakReplies &&
-      kind === "completion" &&
-      runId !== undefined &&
-      active.environmentId === environmentId &&
-      active.threadId === thread.id
-    ) {
+    if (speakReplies && kind === "completion" && runId !== undefined) {
       void speak(environmentId, { threadId: thread.id, runId }).catch(reportSpeechFailure);
     }
     const title =
