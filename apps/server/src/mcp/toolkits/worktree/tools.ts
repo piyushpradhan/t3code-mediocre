@@ -6,6 +6,8 @@ import {
   VcsListRefsResult,
   WorktreeMcpHandoffInput,
   WorktreeMcpHandoffResult,
+  WorktreeMcpProductWorktreeInput,
+  WorktreeMcpProductWorktreeResult,
   WorktreeMcpStatusResult,
   ThreadId,
 } from "@t3tools/contracts";
@@ -60,6 +62,22 @@ const WorktreeStatusTool = Tool.make("t3_worktree_status", {
   .annotate(Tool.OpenWorld, false)
   .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
 
+const ProductWorktreeTool = Tool.make("t3_product_worktree", {
+  description:
+    "In a product worktree thread, give one of its projects a worktree on the thread's branch before you change it. Its folder in your working directory becomes that worktree; until then it links to the user's own checkout. Safe to repeat.",
+  parameters: WorktreeMcpProductWorktreeInput,
+  success: WorktreeMcpProductWorktreeResult,
+  failure: WorktreeToolFailure,
+  failureMode: "return",
+  dependencies,
+})
+  .annotate(Tool.Title, "Create a product project worktree")
+  .annotate(Tool.Readonly, false)
+  .annotate(Tool.Destructive, false)
+  .annotate(Tool.Idempotent, true)
+  .annotate(Tool.OpenWorld, false)
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
+
 const WorktreeListTool = Tool.make("t3_worktree_list", {
   description:
     "List branch refs and checkout paths for a thread's workspace. Omit `threadId` for this thread. Detached worktrees with no branch are left out.",
@@ -87,5 +105,6 @@ const WorktreeListTool = Tool.make("t3_worktree_list", {
 export const WorktreeToolkit = Toolkit.make(
   WorktreeHandoffTool,
   WorktreeStatusTool,
+  ProductWorktreeTool,
   WorktreeListTool,
 );

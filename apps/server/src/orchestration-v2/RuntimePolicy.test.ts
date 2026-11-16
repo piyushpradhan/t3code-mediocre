@@ -48,7 +48,7 @@ function makeThread(input: {
     modelSelection,
     runtimeMode: input.runtimeMode ?? "full-access",
     interactionMode: "default",
-    branch: null,
+    branch: input.worktreePath === null ? null : "feature/runtime-policy",
     worktreePath: input.worktreePath,
     activeProviderThreadId: null,
     lineage: {
@@ -165,11 +165,13 @@ it.layer(NodeServices.layer)("RuntimePolicyV2 products", (it) => {
       const local = yield* resolve(null);
       assert.equal(local.cwd, folder);
       assert.deepEqual(local.additionalDirectories, [memberRoot]);
+      assert.isUndefined(local.productWorktree);
       // A member worktree is a real folder inside the thread's folder, so the sandbox covers it.
       yield* fileSystem.makeDirectory(path.join(threadFolder, "shared-lib"), { recursive: true });
       const worktree = yield* resolve(threadFolder);
       assert.equal(worktree.cwd, threadFolder);
       assert.isUndefined(worktree.additionalDirectories);
+      assert.isTrue(worktree.productWorktree);
     }),
   );
 });

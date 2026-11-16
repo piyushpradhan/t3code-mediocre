@@ -13,6 +13,8 @@ export function buildRuntimeInstructions(runtime: {
   readonly pullRequestLinking?: boolean;
   /** The thread's other product folders, from the runtime policy's `additionalDirectories`. */
   readonly productDirectories?: ReadonlyArray<string> | undefined;
+  /** The runtime policy's `productWorktree`. */
+  readonly productWorktree?: boolean | undefined;
 }): string {
   const harness = toSingleLine(runtime.harness);
   const model = toSingleLine(runtime.model ?? "");
@@ -23,7 +25,10 @@ export function buildRuntimeInstructions(runtime: {
   const modelInfo = model && model !== "auto" && model !== "default" ? `, as ${modelLabel}` : "";
   const effortInfo = effort ? ` with ${effort} reasoning effort` : "";
   const runtimeInfo = `<runtime_info>In case you're asked: you are running in T3 Code through the ${harness} harness${modelInfo}${effortInfo}. No need to mention this otherwise. You can embed images, video, and audio using Markdown image syntax with absolute file paths. Link every other file you cite or produce by its absolute path, as in [http.ts:42](/abs/path/http.ts:42), so the user can open it in T3 Code's files viewer.</runtime_info>`;
-  const productFolders = buildProductFoldersInstructions(runtime.productDirectories);
+  const productFolders = buildProductFoldersInstructions(
+    runtime.productDirectories,
+    runtime.productWorktree,
+  );
   const productInfo = productFolders === "" ? "" : `\n\n${productFolders}`;
   return runtime.pullRequestLinking === false
     ? runtimeInfo + productInfo
@@ -33,10 +38,13 @@ export function buildRuntimeInstructions(runtime: {
 /** Empty when the thread's project is not part of a product. */
 export function buildProductFoldersInstructions(
   directories: ReadonlyArray<string> | undefined,
+  worktree?: boolean,
 ): string {
   if (directories === undefined || directories.length === 0) return "";
   const list = directories.map((directory) => `- ${toSingleLine(directory)}`).join("\n");
-  return `<product_folders>\nThis thread works in a product. Its working directory links to these project folders; read and change them as part of the workspace:\n${list}\n</product_folders>`;
+  return worktree === true
+    ? `<product_folders>\nThis thread works in a product, on its own branch. Its working directory links to these project folders, the user's own checkouts. Read them freely, but before you change, create, or delete files in one, call t3_product_worktree with its folder name: that folder becomes a worktree on this thread's branch. Leave projects you do not change as links.\n${list}\n</product_folders>`
+    : `<product_folders>\nThis thread works in a product. Its working directory links to these project folders; read and change them as part of the workspace:\n${list}\n</product_folders>`;
 }
 
 function toSingleLine(value: string): string {

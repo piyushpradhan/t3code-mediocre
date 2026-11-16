@@ -53,6 +53,13 @@ const handlers = {
       return yield* service.status(scope);
     }),
   ),
+  t3_product_worktree: McpToolAccess.actsAsCaller((input) =>
+    Effect.gen(function* () {
+      const scope = yield* McpInvocationContext.McpInvocationContext;
+      const service = yield* WorktreeMcpService.WorktreeMcpService;
+      return yield* service.productWorktree(scope, input);
+    }),
+  ),
 } satisfies McpToolAccess.Handlers<typeof WorktreeToolkit.tools>;
 
 export const layer = McpToolAccess.toLayer(WorktreeToolkit, handlers);

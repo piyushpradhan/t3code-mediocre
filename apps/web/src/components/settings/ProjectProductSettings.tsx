@@ -31,7 +31,7 @@ export function ProjectProductSettings({
     <SettingsSection title="Product">
       <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
         Threads start in the product's folder, which holds every project below. Threads in a
-        worktree get a worktree of each Git project, on the same branch.
+        worktree get a worktree of each Git project they change, on the same branch.
       </p>
       {supported.map((member) => {
         const selected = new Set(member.productProjectIds ?? []);

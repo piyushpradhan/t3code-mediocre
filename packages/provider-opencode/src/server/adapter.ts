@@ -3488,6 +3488,7 @@ export const makeOpenCodeAdapterV2 = Effect.fn("makeOpenCodeAdapterV2")(function
                 harness: "OpenCode",
                 model: turn.modelSelection.model,
                 productDirectories: turn.runtimePolicy.additionalDirectories,
+                productWorktree: turn.runtimePolicy.productWorktree,
               }),
             ]
               .filter(Boolean)

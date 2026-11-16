@@ -831,7 +831,10 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
             writableRoots: [...(requestedSandboxPolicy.writableRoots ?? []), ...productDirectories],
           }
         : requestedSandboxPolicy;
-    const productFolders = buildProductFoldersInstructions(productDirectories);
+    const productFolders = buildProductFoldersInstructions(
+      productDirectories,
+      input.runtimePolicy.productWorktree,
+    );
     const selectedEffort =
       getModelSelectionStringOptionValue(input.modelSelection, "reasoningEffort") ??
       codexDefaultReasoningEffortOverride(input.modelSelection.model);

@@ -85,6 +85,20 @@ export const WorktreeMcpStatusResult = Schema.Struct({
 });
 export type WorktreeMcpStatusResult = typeof WorktreeMcpStatusResult.Type;
 
+export const WorktreeMcpProductWorktreeInput = Schema.Struct({
+  project: TrimmedNonEmptyString.annotate({
+    description: "The project's folder name in your working directory, or its path.",
+  }),
+});
+export type WorktreeMcpProductWorktreeInput = typeof WorktreeMcpProductWorktreeInput.Type;
+
+export const WorktreeMcpProductWorktreeResult = Schema.Struct({
+  worktreePath: TrimmedNonEmptyString,
+  branch: TrimmedNonEmptyString,
+  created: Schema.Boolean,
+});
+export type WorktreeMcpProductWorktreeResult = typeof WorktreeMcpProductWorktreeResult.Type;
+
 export class WorktreeMcpFailure extends Schema.TaggedError<WorktreeMcpFailure>()(
   "WorktreeMcpFailure",
   {

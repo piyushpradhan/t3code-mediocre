@@ -51,6 +51,8 @@ export const ProviderAdapterV2RuntimePolicy = Schema.Struct({
   cwd: Schema.NullOr(Schema.String),
   /** Folders of the thread's other product projects, which the agent may read and edit too. */
   additionalDirectories: Schema.optional(Schema.Array(Schema.String)),
+  /** A product thread in its own folder, whose linked projects get worktrees once changed. */
+  productWorktree: Schema.optional(Schema.Boolean),
   approvalPolicy: Schema.optional(Schema.Unknown),
   sandboxPolicy: Schema.optional(Schema.Unknown),
   /**

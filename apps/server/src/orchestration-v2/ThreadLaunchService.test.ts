@@ -74,6 +74,7 @@ import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAda
 
 const projectId = ProjectId.make("project:launch-test");
 const otherProjectId = ProjectId.make("project:launch-other");
+const productId = ProjectId.make("project:launch-product");
 const encodeThreadProjection = Schema.encodeEffect(OrchestrationV2ThreadProjectionJson);
 const modelSelection = {
   instanceId: ProviderInstanceId.make("codex"),
@@ -101,6 +102,14 @@ const otherProject = {
   title: "Other",
   workspaceRoot: "/other-repo",
 } as const;
+
+const product = {
+  ...project,
+  id: productId,
+  title: "Product",
+  workspaceRoot: "/products/acme",
+  productProjectIds: [projectId, otherProjectId],
+};
 
 const adapter = {
   instanceId: modelSelection.instanceId,
@@ -205,7 +214,9 @@ function makeHarness(options: HarnessOptions = {}) {
             ? Option.some(project)
             : id === otherProjectId
               ? Option.some(otherProject)
-              : Option.none(),
+              : id === productId
+                ? Option.some(product)
+                : Option.none(),
         ),
       getByWorkspaceRoot: () => Effect.succeedSome(project),
       workspaceScanDirectory: () => Effect.die("unused"),
@@ -328,11 +339,12 @@ function launchInput(input: {
   readonly thread: string;
   readonly message?: string;
   readonly workspace?: ThreadLaunch.ThreadLaunchWorkspaceStrategy;
+  readonly projectId?: ProjectId;
 }) {
   return {
     commandId: CommandId.make(input.command),
     threadId: ThreadId.make(input.thread),
-    projectId,
+    projectId: input.projectId ?? projectId,
     title: "New thread",
     modelSelection,
     runtimeMode: "full-access" as const,
@@ -3054,8 +3066,45 @@ it.effect.each(["origin/master", ":/initial"])(
           projectId,
           workspaceStrategy: { type: "existing_worktree", worktreePath: "/existing-worktree" },
         });
+        // A product's folder is no repository; each project gets its worktree when changed.
+        yield* launches.checkWorktreeBase({
+          projectId: productId,
+          workspaceStrategy: { type: "worktree", baseRef, startFromOrigin: true },
+        });
       }).pipe(Effect.provide(harness.layer));
     }),
+);
+
+it.effect("names a product thread's branch past branches its projects already hold", () =>
+  Effect.gen(function* () {
+    const harness = makeHarness({
+      git: {
+        listLocalBranchNames: (cwd) =>
+          Effect.succeed(cwd === project.workspaceRoot ? ["generated-branch"] : []),
+      },
+    });
+    yield* Effect.gen(function* () {
+      const launches = yield* ThreadLaunch.ThreadLaunchService;
+      const threads = yield* ThreadManagement.ThreadManagementService;
+      const tracker = yield* WorktreeSetupTracker.WorktreeSetupTracker;
+      const launched = yield* launches.launch(
+        launchInput({
+          command: "launch:product-branch",
+          thread: "thread:product-branch",
+          projectId: productId,
+          message: "Start",
+          workspace: { type: "worktree", baseRef: "HEAD" },
+        }),
+      );
+      yield* tracker.stream(launched.threadId).pipe(
+        Stream.filter((snapshot) => snapshot?.phase === "done"),
+        Stream.runHead,
+      );
+      const { thread } = yield* threads.getThreadProjection(launched.threadId);
+      assert.equal(thread.branch, "generated-branch-1");
+      assert.isEmpty(harness.renameBranch.mock.calls);
+    }).pipe(Effect.provide(harness.layer));
+  }),
 );
 
 it.effect("leaves uncertain Git detection failures to workspace preparation", () =>

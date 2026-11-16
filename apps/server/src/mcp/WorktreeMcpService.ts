@@ -7,6 +7,8 @@ import {
   type WorktreeMcpContinuationStatus,
   type WorktreeMcpHandoffInput,
   type WorktreeMcpHandoffResult,
+  type WorktreeMcpProductWorktreeInput,
+  type WorktreeMcpProductWorktreeResult,
   type WorktreeMcpSetupScriptStatus,
   type WorktreeMcpStatusResult,
   type VcsListRefsInput,
@@ -20,14 +22,19 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 import type * as PlatformError from "effect/PlatformError";
 
+import * as ServerConfig from "../config.ts";
 import * as GitWorkflowService from "../git/GitWorkflowService.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ProjectSetupScriptRunner from "../project/ProjectSetupScriptRunner.ts";
+import { productMemberFolderName } from "../project/productWorkspaces.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as VcsStatusBroadcaster from "../vcs/VcsStatusBroadcaster.ts";
+import { makeWorktreeRecovery } from "../workspace/restoreMissingWorktree.ts";
+import { withWorkspaceLease } from "../workspace/workspaceLease.ts";
 import type { McpInvocationScope, McpThreadInvocationScope } from "./McpInvocationContext.ts";
 
 export class WorktreeMcpService extends Context.Service<
@@ -40,6 +47,10 @@ export class WorktreeMcpService extends Context.Service<
     readonly status: (
       scope: McpInvocationScope,
     ) => Effect.Effect<WorktreeMcpStatusResult, WorktreeMcpFailure>;
+    readonly productWorktree: (
+      scope: McpInvocationScope,
+      input: WorktreeMcpProductWorktreeInput,
+    ) => Effect.Effect<WorktreeMcpProductWorktreeResult, WorktreeMcpFailure>;
     readonly listRefs: (
       input: Omit<VcsListRefsInput, "cwd"> & {
         readonly worktreePath: string | null;
@@ -69,12 +80,14 @@ const asOperationFailed = (prefix: string) =>
 const make = Effect.gen(function* () {
   const random = yield* SecureRandom.SecureRandom;
   const fileSystem = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
   const threadManagement = yield* ThreadManagementService.ThreadManagementService;
   const projects = yield* ProjectService.ProjectService;
   const serverSettings = yield* ServerSettings.ServerSettingsService;
   const gitWorkflow = yield* GitWorkflowService.GitWorkflowService;
   const setupScriptRunner = yield* ProjectSetupScriptRunner.ProjectSetupScriptRunner;
   const vcsStatusBroadcaster = yield* VcsStatusBroadcaster.VcsStatusBroadcaster;
+  const { recreate: createMemberWorktree } = yield* makeWorktreeRecovery;
 
   // Serialize handoffs per thread to avoid creating two worktrees and orphaning one.
   const handoffThreadsInFlight = new Set<string>();
@@ -439,6 +452,72 @@ const make = Effect.gen(function* () {
     },
   );
 
+  // A worktree product thread links each member to the user's checkout until the agent claims it.
+  const productWorktree: WorktreeMcpService["Service"]["productWorktree"] = Effect.fn(
+    "WorktreeMcpService.productWorktree",
+  )(function* (callerScope, input) {
+    yield* requireCapability(callerScope);
+    const scope = yield* requireThreadScope(callerScope);
+    const { thread } = yield* loadThread(scope);
+    const project = yield* loadProject(scope, thread.projectId);
+    if (project.productProjectIds == null) {
+      return yield* failure("invalid_request", "This thread's project is not a product.");
+    }
+    const { worktreePath: folder, branch } = thread;
+    if (folder === null || branch === null) {
+      return yield* failure(
+        "invalid_request",
+        "This thread works in the product's own folder, so change its projects in place.",
+      );
+    }
+    const name = path.basename(input.project);
+    const members = yield* Effect.forEach(project.productProjectIds, (memberId) =>
+      projects.getById(memberId),
+    ).pipe(asOperationFailed("Unable to read the product's projects"));
+    const member = members
+      .map(Option.getOrUndefined)
+      .find(
+        (candidate) =>
+          candidate !== undefined &&
+          productMemberFolderName(path, candidate.workspaceRoot) === name,
+      );
+    if (member === undefined) {
+      return yield* failure(
+        "invalid_request",
+        `'${input.project}' is not a project of this product.`,
+      );
+    }
+    const memberRoot = member.workspaceRoot;
+    const isGit = yield* fileSystem
+      .exists(path.join(memberRoot, ".git"))
+      .pipe(asOperationFailed("Unable to read the project"));
+    if (!isGit) {
+      return yield* failure(
+        "invalid_request",
+        `'${name}' is not a Git repository, so it has no worktree; change it in place.`,
+      );
+    }
+    const entry = path.join(folder, name);
+    return yield* withWorkspaceLease(
+      entry,
+      Effect.gen(function* () {
+        const isLink = yield* fileSystem.readLink(entry).pipe(
+          Effect.as(true),
+          Effect.orElseSucceed(() => false),
+        );
+        if (!isLink && (yield* fileSystem.exists(entry))) {
+          return { worktreePath: entry, branch, created: false };
+        }
+        if (isLink) yield* fileSystem.remove(entry);
+        yield* createMemberWorktree({ cwd: memberRoot, worktreePath: entry, branch }).pipe(
+          // Put the link back, so the member stays reachable.
+          Effect.tapError(() => fileSystem.symlink(memberRoot, entry).pipe(Effect.ignore)),
+        );
+        return { worktreePath: entry, branch, created: true };
+      }).pipe(asOperationFailed(`Unable to create a worktree of '${name}'`)),
+    );
+  });
+
   const listRefs: WorktreeMcpService["Service"]["listRefs"] = Effect.fn(
     "WorktreeMcpService.listRefs",
   )(function* ({ worktreePath, workspaceRoot, ...refs }) {
@@ -450,7 +529,7 @@ const make = Effect.gen(function* () {
     return yield* gitWorkflow.listRefs({ ...refs, cwd });
   });
 
-  return WorktreeMcpService.of({ handoff, status, listRefs });
+  return WorktreeMcpService.of({ handoff, status, productWorktree, listRefs });
 });
 
 export const layer: Layer.Layer<
@@ -458,6 +537,8 @@ export const layer: Layer.Layer<
   never,
   | SecureRandom.SecureRandom
   | FileSystem.FileSystem
+  | Path.Path
+  | ServerConfig.ServerConfig
   | ThreadManagementService.ThreadManagementService
   | ProjectService.ProjectService
   | ServerSettings.ServerSettingsService

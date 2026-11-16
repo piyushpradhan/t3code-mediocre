@@ -2143,6 +2143,7 @@ export function makeClaudeQueryOptions(input: {
   readonly resumeSessionAt?: string;
   readonly cwd: string | null;
   readonly productDirectories?: ReadonlyArray<string>;
+  readonly productWorktree?: boolean;
   readonly attachmentsDir?: string;
   readonly settings?: ClaudeSettings;
   readonly promptSuggestions?: boolean;
@@ -2304,6 +2305,7 @@ export function makeClaudeQueryOptions(input: {
         buildRuntimeInstructions({
           harness: "Claude Code",
           productDirectories: input.productDirectories,
+          productWorktree: input.productWorktree,
         }) +
           (input.mcpServers === undefined
             ? ""
@@ -12738,6 +12740,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             ...(turnInput.runtimePolicy.additionalDirectories === undefined
               ? {}
               : { productDirectories: turnInput.runtimePolicy.additionalDirectories }),
+            ...(turnInput.runtimePolicy.productWorktree === undefined
+              ? {}
+              : { productWorktree: turnInput.runtimePolicy.productWorktree }),
             attachmentsDir,
             settings: adapterOptions.settings,
             // Delegated threads have no one typing, so they never ask for suggestions.

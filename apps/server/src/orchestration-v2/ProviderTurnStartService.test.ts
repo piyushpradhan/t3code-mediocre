@@ -106,6 +106,7 @@ function startWithMissingWorktree(
     [`${managedWorktreesDir}/project`]: `${managedWorktreesDir}/project`,
   },
   productMemberRoot?: string,
+  localBranches: Array<string> = ["feature/restore"],
 ) {
   const memberId = ProjectId.make("project_provider_turn_start_product_member");
   const threadId = ThreadId.make("thread_provider_turn_start_projection_failure");
@@ -157,7 +158,8 @@ function startWithMissingWorktree(
   const startRootRun = vi.fn(() => Effect.void);
   const pruneWorktrees = vi.fn(() => Effect.void);
   const createWorktree = vi.fn(() => Effect.succeed({} as never));
-  const listLocalBranchNames = vi.fn(() => Effect.succeed(["feature/restore"]));
+  const listLocalBranchNames = vi.fn(() => Effect.succeed(localBranches));
+  const symlink = vi.fn(() => Effect.void);
   const layer = ProviderTurnStart.layer.pipe(
     Layer.provide(
       Layer.mergeAll(
@@ -168,6 +170,7 @@ function startWithMissingWorktree(
         Layer.succeed(FileSystem.FileSystem, {
           exists: (target: string) => Effect.succeed(target === `${productMemberRoot}/.git`),
           makeDirectory: () => Effect.void,
+          symlink,
           readLink: (target: string) =>
             Effect.fail(
               PlatformError.systemError({
@@ -251,6 +254,7 @@ function startWithMissingWorktree(
     start,
     pruneWorktrees,
     createWorktree,
+    symlink,
     writeIfRunCurrent,
     startRootRun,
     projectionReads: () => projectionReadCount,
@@ -312,14 +316,29 @@ it.each([
   expect(harness.createWorktree).toHaveBeenCalledTimes(input.recreated ? 1 : 0);
 });
 
-it("fills a product thread's folder with a worktree of each Git member", async () => {
+it("links a product thread's Git members until the agent claims one", async () => {
+  const harness = startWithMissingWorktree(
+    `${managedWorktreesDir}/project/feature-restore`,
+    undefined,
+    "/tmp/provider-turn-start-lib",
+    ["main"],
+  );
+  await harness.start;
+  expect(harness.createWorktree).not.toHaveBeenCalled();
+  expect(harness.symlink).toHaveBeenCalledWith(
+    "/tmp/provider-turn-start-lib",
+    `${managedWorktreesDir}/project/feature-restore/provider-turn-start-lib`,
+  );
+});
+
+it("restores the worktree of a product member that holds the thread's branch", async () => {
   const harness = startWithMissingWorktree(
     `${managedWorktreesDir}/project/feature-restore`,
     undefined,
     "/tmp/provider-turn-start-lib",
   );
   await harness.start;
-  expect(harness.createWorktree).toHaveBeenCalledOnce();
+  expect(harness.symlink).not.toHaveBeenCalled();
   expect(harness.createWorktree).toHaveBeenCalledWith({
     cwd: "/tmp/provider-turn-start-lib",
     refName: "feature/restore",
