@@ -116,6 +116,7 @@ interface HarnessOptions {
   readonly deleteLocalBranchFails?: boolean;
   readonly createWorktreeGate?: Effect.Effect<void>;
   readonly existsFails?: boolean;
+  readonly productMembers?: ReadonlyArray<Project>;
 }
 
 const makeHarness = (options: HarnessOptions = {}) => {
@@ -178,13 +179,18 @@ const makeHarness = (options: HarnessOptions = {}) => {
       ? Effect.succeed(makeProjection(thread))
       : Effect.fail(new OrchestratorProjectionError({ threadId: id }));
   });
+  const members = options.productMembers;
   const getById = vi.fn((id: ProjectId) =>
     options.projectReadFails
       ? (Effect.fail("simulated project read failure") as never)
       : Effect.succeed(
           id === projectId && options.projectMissing !== true
-            ? Option.some(project)
-            : Option.none(),
+            ? Option.some(
+                members === undefined
+                  ? project
+                  : { ...project, productProjectIds: members.map((member) => member.id) },
+              )
+            : Option.fromNullishOr(members?.find((member) => member.id === id)),
         ),
   );
   const removeWorktree = vi.fn((_: unknown) =>
@@ -313,6 +319,9 @@ const makeHarness = (options: HarnessOptions = {}) => {
         Layer.mock(VcsStatusBroadcaster.VcsStatusBroadcaster)({
           refreshStatus,
         } satisfies Partial<VcsStatusBroadcaster.VcsStatusBroadcaster["Service"]>),
+        Layer.mock(ServerConfig.ServerConfig)({
+          worktreesDir: "/worktrees",
+        } as ServerConfig.ServerConfig["Service"]),
         NodeServices.layer,
         NodeCrypto.layer,
         options.existsFails
@@ -374,6 +383,12 @@ const runStatus = (harness: ReturnType<typeof makeHarness>) =>
   Effect.gen(function* () {
     const service = yield* WorktreeMcpService.WorktreeMcpService;
     return yield* service.status(harness.scope);
+  }).pipe(Effect.provide(harness.layer));
+
+const runProductWorktree = (harness: ReturnType<typeof makeHarness>, project: string) =>
+  Effect.gen(function* () {
+    const service = yield* WorktreeMcpService.WorktreeMcpService;
+    return yield* service.productWorktree(harness.scope, { project });
   }).pipe(Effect.provide(harness.layer));
 
 const decodeHandoffInput = Schema.decodeUnknownEffect(WorktreeMcpHandoffInput);
@@ -699,6 +714,65 @@ describe("t3_worktree_status", () => {
       });
     });
   });
+});
+
+describe("t3_product_worktree", () => {
+  const makeProduct = Effect.fn(function* (thread: ThreadFixture) {
+    const fs = yield* FileSystem.FileSystem;
+    const root = yield* fs.makeTempDirectoryScoped({ prefix: "product-worktree-" });
+    const memberRoot = `${root}/api`;
+    yield* fs.makeDirectory(`${memberRoot}/.git`, { recursive: true });
+    yield* fs.makeDirectory(`${root}/thread`);
+    yield* fs.symlink(memberRoot, `${root}/thread/api`);
+    const harness = makeHarness({
+      thread: {
+        ...thread,
+        worktreePath: thread.worktreePath === null ? null : `${root}/thread`,
+      },
+      productMembers: [
+        { ...project, id: ProjectId.make("project-api"), workspaceRoot: memberRoot },
+      ],
+      git: {
+        pruneWorktrees: () => Effect.void,
+        resolvePrimaryRemoteName: () => Effect.succeed("origin"),
+        hasCommit: () => Effect.succeed(false),
+        invalidateLocalStatus: () => Effect.void,
+      },
+    });
+    return { fs, root, memberRoot, harness };
+  });
+
+  it.effect("turns a linked project into a worktree on the thread's branch, once", () =>
+    Effect.gen(function* () {
+      const { fs, root, memberRoot, harness } = yield* makeProduct({ branch: "feature/product" });
+      const entry = `${root}/thread/api`;
+
+      const result = yield* runProductWorktree(harness, memberRoot);
+      expect(result).toEqual({ worktreePath: entry, branch: "feature/product", created: true });
+      expect(harness.createWorktree).toHaveBeenCalledWith({
+        cwd: memberRoot,
+        refName: "refs/heads/dev",
+        newRefName: "feature/product",
+        baseRefName: "refs/heads/dev",
+        path: entry,
+      });
+      expect(yield* Effect.exit(fs.readLink(entry))).toMatchObject({ _tag: "Failure" });
+
+      yield* fs.makeDirectory(entry);
+      expect(yield* runProductWorktree(harness, "api")).toMatchObject({ created: false });
+      expect(harness.createWorktree).toHaveBeenCalledOnce();
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("leaves projects in place for a thread in the product's own folder", () =>
+    Effect.gen(function* () {
+      const { fs, root, harness } = yield* makeProduct({ branch: null, worktreePath: null });
+      const exit = yield* Effect.exit(runProductWorktree(harness, "api"));
+      expectTypedFailure(exit, { _tag: "WorktreeMcpFailure", code: "invalid_request" });
+      expect(harness.createWorktree).not.toHaveBeenCalled();
+      expect(yield* fs.readLink(`${root}/thread/api`)).toContain("api");
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
 });
 
 describe("t3_worktree_list", () => {

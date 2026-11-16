@@ -2190,6 +2190,7 @@ export const makeMuseAdapterV2 = Effect.fn("makeMuseAdapterV2")(function* (
                       model: session.model ?? undefined,
                       reasoningEffort: effort,
                       productDirectories: turnInput.runtimePolicy.additionalDirectories,
+                      productWorktree: turnInput.runtimePolicy.productWorktree,
                     }),
                   },
                   ...parts,

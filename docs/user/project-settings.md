@@ -274,9 +274,10 @@ project** on the new thread screen. A product appears in the sidebar like a proj
 threads and settings. Change its projects later in Settings → Projects → **Product**.
 
 A product thread starts in the product's own folder, which holds a link to each project's folder.
-In **New worktree** mode, that folder instead holds a worktree of each Git project on one shared
-branch, and links to the projects that are not Git repositories. Deleting the thread's worktree
-deletes those worktrees too. The product folder is not a Git repository, so diffs, checkpoints,
+In **New worktree** mode, the thread gets a folder of its own with the same links and a branch.
+The first time the agent changes a Git project, that project's link becomes a worktree on the
+thread's branch, so projects the agent only reads get no worktree and your checkouts stay
+untouched. Deleting the thread's worktree deletes those worktrees too. The product folder is not a Git repository, so diffs, checkpoints,
 and the source control panel are not available at the product level.
 
 ## Project icons

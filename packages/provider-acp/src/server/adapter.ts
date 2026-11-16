@@ -8448,6 +8448,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             harness: flavor.runtimeHarness ?? driver,
             model: turnInput.modelSelection.model,
             productDirectories: turnInput.runtimePolicy.additionalDirectories,
+            productWorktree: turnInput.runtimePolicy.productWorktree,
             pullRequestLinking:
               sessionSetup === null ||
               flavor.sessionCarriesPullRequestLinking?.(sessionSetup.initializeResult) !== true,

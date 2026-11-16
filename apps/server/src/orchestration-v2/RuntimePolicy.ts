@@ -196,6 +196,9 @@ export const layerFromProjectStore: Layer.Layer<
           interactionMode: input.thread.interactionMode,
           cwd,
           ...(additionalDirectories.length === 0 ? {} : { additionalDirectories }),
+          ...(members.length > 0 && worktreePath !== null && input.thread.branch !== null
+            ? { productWorktree: true }
+            : {}),
           ...(maxRuntimeMode === undefined ? {} : { maxRuntimeMode }),
         });
       }),

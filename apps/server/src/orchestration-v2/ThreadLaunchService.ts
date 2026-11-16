@@ -355,6 +355,28 @@ const make = Effect.gen(function* () {
     }
   });
 
+  // Members get the branch only once changed, so a name taken in any Git member is taken.
+  // ponytail: two product threads named at once can still pick the same name; claiming then fails.
+  const availableProductBranch = Effect.fn("ThreadLaunchService.availableProductBranch")(function* (
+    memberIds: ReadonlyArray<ProjectId>,
+    requested: string,
+  ) {
+    const taken = new Set<string>();
+    for (const memberId of memberIds) {
+      const member = Option.getOrUndefined(
+        yield* projects.getById(memberId).pipe(Effect.orElseSucceed(() => Option.none())),
+      );
+      if (member === undefined) continue;
+      const names = yield* git
+        .listLocalBranchNames(member.workspaceRoot)
+        .pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
+      for (const name of names) taken.add(name);
+    }
+    let branch = requested;
+    for (let suffix = 1; taken.has(branch); suffix += 1) branch = `${requested}-${suffix}`;
+    return { branch };
+  });
+
   const checkWorktreeBase: ThreadLaunchService["Service"]["checkWorktreeBase"] = Effect.fn(
     "ThreadLaunchService.checkWorktreeBase",
   )(function* (input) {
@@ -375,7 +397,8 @@ const make = Effect.gen(function* () {
     if (isScratch) return;
     if (Option.isSome(receipt) && receipt.value.status === "accepted") return;
     const project = Option.getOrUndefined(projectOption);
-    if (project === undefined) return;
+    // A product's folder is no repository; launch() gives it a folder, not a worktree.
+    if (project === undefined || project.productProjectIds != null) return;
     const cwd = project.workspaceRoot;
     const { baseRef, branch } = strategy;
     const checksBranch = branch !== undefined && !isTemporaryWorktreeBranch(branch);
@@ -851,7 +874,7 @@ const make = Effect.gen(function* () {
           Effect.flatMap(({ branch: newBranch, exactName }) =>
             // A product folder has no branch of its own; turn start renames its member worktrees.
             isProduct
-              ? Effect.succeed({ branch: newBranch })
+              ? availableProductBranch(project.productProjectIds ?? [], newBranch)
               : git
                   .renameBranch({
                     cwd: worktreeCwd,

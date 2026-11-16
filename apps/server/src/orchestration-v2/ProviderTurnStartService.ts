@@ -210,8 +210,8 @@ export const layer: Layer.Layer<
     const gitWorkflow = yield* GitWorkflowService.GitWorkflowService;
     const turnItemPositions = yield* TurnItemPositionStore.TurnItemPositionStoreV2;
 
-    // A product's folder holds one entry per member: a worktree on the thread's branch for Git
-    // members of a worktree thread, otherwise a link to the member's own folder.
+    // A product's folder holds one entry per member: a link to the member's own folder, or for a
+    // member the agent claimed through t3_product_worktree, a worktree on the thread's branch.
     const materializeProductFolder = Effect.fn("ProviderTurnStartService.materializeProductFolder")(
       function* (input: {
         readonly productProjectIds: ReadonlyArray<ProjectId>;
@@ -250,8 +250,12 @@ export const layer: Layer.Layer<
           }
           // A link whose member folder moved; replace it.
           if (isLink) yield* fileSystem.remove(entry);
-          const isGitMember = yield* fileSystem.exists(path.join(member.workspaceRoot, ".git"));
-          if (input.branch !== null && isGitMember) {
+          // A member holding the thread's branch was claimed before; bring its worktree back.
+          const isClaimedMember =
+            input.branch !== null &&
+            (yield* fileSystem.exists(path.join(member.workspaceRoot, ".git"))) &&
+            (yield* gitWorkflow.listLocalBranchNames(member.workspaceRoot)).includes(input.branch);
+          if (input.branch !== null && isClaimedMember) {
             const branch = input.branch;
             yield* recreateMissingWorktree({
               cwd: member.workspaceRoot,

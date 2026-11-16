@@ -244,8 +244,8 @@ function AddProductDialog({
             <DialogTitle>Add product</DialogTitle>
             <DialogDescription>
               Group projects so one thread works across all of them. Threads start in a folder that
-              holds every project; worktree threads get a worktree of each Git project on one
-              branch.
+              holds every project; worktree threads get a worktree of each Git project they change,
+              on one branch.
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>

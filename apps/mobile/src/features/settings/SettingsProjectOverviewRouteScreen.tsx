@@ -482,7 +482,7 @@ function ProductSection(props: {
   return (
     <SettingsSection
       title={props.showEnvironment ? `Product · ${props.target.label}` : "Product"}
-      footer="Threads start in the product's folder, which holds every project switched on here. Threads in a worktree get a worktree of each Git project, on the same branch."
+      footer="Threads start in the product's folder, which holds every project switched on here. Threads in a worktree get a worktree of each Git project they change, on the same branch."
     >
       {candidates.map((project) => (
         <SettingsSwitchRow
