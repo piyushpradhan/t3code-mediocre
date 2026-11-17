@@ -2290,6 +2290,13 @@ const layerCoreWsRpc = (
                         message: cause.message,
                         cause,
                       }),
+                    ThreadLaunchBranchExistsError: (cause) =>
+                      new OrchestrationV2ThreadLaunchError({
+                        commandId: input.commandId,
+                        projectId: input.projectId,
+                        message: cause.message,
+                        cause,
+                      }),
                     ThreadLaunchBranchConflictError: (cause) =>
                       new OrchestrationV2ThreadLaunchError({
                         commandId: input.commandId,
