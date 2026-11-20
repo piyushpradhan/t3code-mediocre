@@ -3,11 +3,14 @@
 Customize shortcuts in **Settings → Keybindings** on web and desktop. That page
 also lists the command IDs and defaults available in your version.
 
+To free a default shortcut for another command, choose **Unassign** from its row's
+actions menu. **Reset to default** brings it back.
+
 ## Composer controls
 
 `mod+shift+d` starts the voice assistant and finishes recording on the next press;
-`Esc` discards the recording. Change the chord under **Voice: Start or Finish
-Recording**, and the hold or toggle behavior in **Settings → Voice**. See
+`Esc` discards the recording. Change the chord under **Composer: Start or Finish
+Dictation**, and the hold or toggle behavior in **Settings → Voice**. See
 [Voice input](./voice-input.md).
 
 In **Settings → Chat → Send shortcut**, choose whether Enter sends, requires
@@ -206,6 +209,8 @@ if the browser takes it first.
 
 Many defaults include `!terminalFocus` so they do not intercept terminal input.
 Keep that condition when remapping them if you want the same behavior.
+`sidebar.toggle` never takes a Ctrl chord from a focused terminal, so tmux's `Ctrl+B`
+prefix reaches it. On macOS, `Cmd+B` still toggles the sidebar there.
 
 ## Desktop quit shortcut
 

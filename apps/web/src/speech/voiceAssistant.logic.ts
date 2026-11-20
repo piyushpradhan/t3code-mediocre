@@ -1,7 +1,9 @@
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
+import { msg } from "gt-react";
 import { useSyncExternalStore } from "react";
 
 import type { DraftId } from "../composerDraftStore";
+import { m } from "../i18n/messages";
 
 type VoiceProject = Pick<EnvironmentProject, "id" | "environmentId" | "title" | "archivedAt">;
 
@@ -25,12 +27,12 @@ export function resolveVoiceAssistantProject(text: string, projects: readonly Vo
   if (!project)
     return {
       kind: "error",
-      message: "The spoken project was not found. Use ‘In project [name], …’.",
+      message: m(msg("The spoken project was not found. Use ‘In project [name], …’.")),
     } as const;
   if (matches[1]?.title.trim().length === project.title.trim().length)
     return {
       kind: "error",
-      message: "More than one project has that name. Choose the project manually.",
+      message: m(msg("More than one project has that name. Choose the project manually.")),
     } as const;
   return { kind: "project", project } as const;
 }

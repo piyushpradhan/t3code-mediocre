@@ -2,6 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { useRouter } from "@tanstack/react-router";
+import { msg, useGT } from "gt-react";
 import { useState } from "react";
 
 import { ComposerSpeechRecordingPill } from "~/components/chat/ComposerSpeechButton";
@@ -11,6 +12,7 @@ import { useComposerDraftStore } from "~/composerDraftStore";
 import { useNewThreadHandler } from "~/hooks/useHandleNewThread";
 import { useScratchProject } from "~/hooks/useScratchProject";
 import { getClientSettings, useClientSettings } from "~/hooks/useSettings";
+import { m } from "~/i18n/messages";
 import { useStableCallback } from "~/hooks/useStableCallback";
 import { readProjects } from "~/state/entities";
 import { usePrimaryEnvironmentId } from "~/state/environments";
@@ -34,6 +36,7 @@ function VoiceAssistantSession({ environmentId }: { environmentId: EnvironmentId
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const { openScratchProject } = useScratchProject();
   const handleNewThread = useNewThreadHandler();
+  const gt = useGT();
   const [opening, setOpening] = useState(false);
   const openTranscript = useStableCallback(function openTranscript(text: string) {
     if (!text.trim() || opening) return;
@@ -66,10 +69,10 @@ function VoiceAssistantSession({ environmentId }: { environmentId: EnvironmentId
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not send voice request",
+            title: m(msg("Could not send voice request")),
             description: `${error instanceof Error ? error.message : String(error)}\n\n${text}`,
             timeout: 0,
-            actionProps: { children: "Retry", onClick: () => openTranscript(text) },
+            actionProps: { children: m(msg("Retry")), onClick: () => openTranscript(text) },
           }),
         );
       })
@@ -98,10 +101,10 @@ function VoiceAssistantSession({ environmentId }: { environmentId: EnvironmentId
         <div
           className="fixed inset-x-4 bottom-6 z-50 mx-auto flex max-w-md flex-col gap-2 rounded-xl border bg-background p-3 shadow-lg"
           role="region"
-          aria-label="Voice assistant"
+          aria-label={gt("Voice assistant")}
         >
           <span className="text-sm font-medium">
-            {opening ? "Sending…" : "Voice assistant · No project"}
+            {opening ? gt("Sending…") : gt("Voice assistant · No project")}
           </span>
           {speech.preview ? (
             <p className="text-sm" role="status">

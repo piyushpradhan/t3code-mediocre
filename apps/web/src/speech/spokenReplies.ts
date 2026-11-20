@@ -5,8 +5,10 @@ import {
   SpeechSynthesisError,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
+import { msg } from "gt-react";
 
 import { toastManager } from "../components/ui/toast";
+import { m } from "../i18n/messages";
 import { readPreparedConnection } from "../state/session";
 import { unlockedAudioContext } from "../threadNotifications";
 import { runEnvironmentSpeech } from "./runEnvironmentSpeech";
@@ -50,9 +52,12 @@ export async function speak(
   source.connect(context.destination);
   const toastId = toastManager.add({
     type: "info",
-    title: "Reading reply aloud",
+    title: m(msg("Reading reply aloud")),
     timeout: 0,
-    actionProps: { children: "Stop", onClick: stopSpeaking },
+    actionProps: {
+      children: m(msg("Stop", { $context: "verb, stops audio playback" })),
+      onClick: stopSpeaking,
+    },
     data: { hideCopyButton: true },
   });
   source.addEventListener("ended", () => {
@@ -68,7 +73,8 @@ export function reportSpeechFailure(error: unknown) {
   if (isSynthesisError(error) && error.reason === "nothing-to-say") return;
   toastManager.add({
     type: "error",
-    title: "Couldn’t read the reply aloud",
-    description: error instanceof Error ? error.message : "The speech server didn’t respond.",
+    title: m(msg("Couldn’t read the reply aloud")),
+    description:
+      error instanceof Error ? error.message : m(msg("The speech server didn’t respond.")),
   });
 }
