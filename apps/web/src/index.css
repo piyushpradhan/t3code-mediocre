@@ -405,6 +405,45 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   }
 }
 
+@utility wallpaper-backdrop {
+  html[data-appearance-background] & {
+    background-image: var(--appearance-background-image);
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+  }
+}
+
+@utility wallpaper-clear {
+  html[data-appearance-background] & {
+    background: transparent;
+  }
+}
+
+@utility wallpaper-glass {
+  html[data-appearance-background] & {
+    background: color-mix(in srgb, var(--background) var(--glass-opacity), transparent);
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    backdrop-filter: blur(var(--glass-blur));
+
+    @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+      background: var(--background);
+    }
+  }
+}
+
+@utility wallpaper-sidebar {
+  html[data-appearance-background] & {
+    background: color-mix(in srgb, var(--sidebar) var(--glass-opacity), transparent);
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    backdrop-filter: blur(var(--glass-blur));
+
+    @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+      background: var(--sidebar);
+    }
+  }
+}
+
 @utility alert-glass {
   --alert-glass-tint: transparent;
   background:
@@ -1499,7 +1538,6 @@ html[data-theme-token-probe] *::after {
    roles explicit prevents the thread toolbar from falling back to the default
    dark-mode whites while preserving the same theme file across clients. */
 html[data-theme-id] [data-chat-header] {
-  background-color: var(--toolbar-background);
   color: var(--contrast-toolbar-foreground);
 }
 

@@ -233,7 +233,7 @@ function SidebarProvider({
     <SidebarContext value={contextValue}>
       <div
         className={cn(
-          "group/sidebar-wrapper flex min-h-svh w-full",
+          "group/sidebar-wrapper flex min-h-svh w-full wallpaper-backdrop",
           SIDEBAR_TITLEBAR_CONTROL_SIZE,
           className,
         )}
@@ -311,7 +311,7 @@ function Sidebar({
       <SidebarInstanceContext value={instanceContextValue}>
         <div
           className={cn(
-            "flex h-full w-(--sidebar-width) flex-col bg-sidebar surface-grain text-sidebar-foreground",
+            "flex h-full w-(--sidebar-width) flex-col bg-sidebar surface-grain text-sidebar-foreground wallpaper-sidebar",
             className,
           )}
           data-slot="sidebar"
@@ -338,7 +338,7 @@ function Sidebar({
             keepMounted
             {...(panelAnimationsActive ? {} : { transitionDurationMs: 0 })}
             className={cn(
-              "w-(--sidebar-width) max-w-none bg-sidebar surface-grain p-0 text-sidebar-foreground",
+              "w-(--sidebar-width) max-w-none bg-sidebar surface-grain p-0 text-sidebar-foreground wallpaper-sidebar",
               className,
             )}
             data-mobile="true"
@@ -414,7 +414,7 @@ function Sidebar({
           {...props}
         >
           <div
-            className="flex h-full w-full flex-col bg-sidebar surface-grain group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm/5"
+            className="flex h-full w-full flex-col bg-sidebar surface-grain wallpaper-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm/5"
             data-sidebar="sidebar"
             data-slot="sidebar-inner"
           >
@@ -647,7 +647,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
   return (
     <main
       className={cn(
-        "relative flex min-w-0 w-full flex-1 flex-col bg-background surface-grain",
+        "relative flex min-w-0 w-full flex-1 flex-col bg-background surface-grain wallpaper-clear",
         "md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ms-2 md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ms-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm/5",
         className,
       )}

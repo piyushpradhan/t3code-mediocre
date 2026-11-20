@@ -3410,7 +3410,7 @@ export default function ChatView(props: ChatViewProps) {
   const content = (
     <div
       ref={setWorkspaceLayoutElement}
-      className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background"
+      className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background wallpaper-clear"
     >
       {embedded ? null : (
         <DeviceSetupDialogHost
@@ -3435,7 +3435,7 @@ export default function ChatView(props: ChatViewProps) {
             ref={threadPanelPopoverAnchorRef}
             data-chat-header
             className={cn(
-              "relative bg-background [[data-panel-animations=true]_&]:motion-safe:transition-[padding-left] [[data-panel-animations=true]_&]:motion-safe:duration-(--panel-animation-duration) [[data-panel-animations=true]_&]:motion-safe:ease-out",
+              "relative bg-(--toolbar-background) wallpaper-glass [[data-panel-animations=true]_&]:motion-safe:transition-[padding-left] [[data-panel-animations=true]_&]:motion-safe:duration-(--panel-animation-duration) [[data-panel-animations=true]_&]:motion-safe:ease-out",
               isElectron
                 ? cn(
                     "drag-region flex h-[var(--workspace-topbar-height)] min-h-[var(--workspace-topbar-height)] shrink-0 items-center px-3 sm:px-5",
@@ -3514,7 +3514,7 @@ export default function ChatView(props: ChatViewProps) {
             />
             <div
               {...conversationArea}
-              className="relative flex min-h-0 flex-1 flex-col bg-background"
+              className="relative flex min-h-0 flex-1 flex-col bg-background wallpaper-clear"
             >
               <WorkspaceMutationIdContext value={workspaceMutationId}>
                 <ThreadTimeline

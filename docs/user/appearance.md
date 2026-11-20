@@ -5,6 +5,11 @@ appearance or stay in light or dark mode. To use different themes for light and 
 the corresponding preview within each theme. Appearance preferences are saved separately on each
 device or browser.
 
+To use a picture on web and desktop, choose **Background image** in **Settings → Appearance**.
+Turn on **Use colors from image** to tint the interface from the picture, and adjust **Glass opacity**
+to change how much shows through. The picture stays on this device. Removing it restores your
+selected theme; turning off image colors keeps the picture with your theme's colors.
+
 On web and desktop, use **Change theme** in the command palette to select a theme without leaving chat.
 Press **Cmd+Option+A** on macOS or **Ctrl+Alt+A** on Windows/Linux to open the theme picker directly.
 Use **Change appearance** in the command palette to choose System, Light, or Dark independently of

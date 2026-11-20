@@ -3,6 +3,7 @@ import type { DesktopBridge } from "@t3tools/contracts";
 import { safeErrorLogAttributes } from "@t3tools/client-runtime/errors";
 import * as Schema from "effect/Schema";
 import { useSyncExternalStore } from "react";
+import { subscribeAppearanceBackground } from "../appearanceBackground";
 import {
   applyThemePalette,
   CUSTOM_THEMES_STORAGE_KEY,
@@ -471,9 +472,11 @@ function subscribe(listener: () => void): () => void {
     const mq = typeof window.matchMedia === "function" ? window.matchMedia(MEDIA_QUERY) : null;
     mq?.addEventListener("change", handleSystemAppearanceChange);
     window.addEventListener("storage", handleStorageChange);
+    const unsubscribeBackground = subscribeAppearanceBackground(() => refreshTheme());
     removeWindowListeners = () => {
       mq?.removeEventListener("change", handleSystemAppearanceChange);
       window.removeEventListener("storage", handleStorageChange);
+      unsubscribeBackground();
     };
   }
 

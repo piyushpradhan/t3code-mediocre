@@ -37,6 +37,7 @@ import { AdvancedSettings } from "./AdvancedSettings";
 import { PanelAnimationsPreview } from "./PanelAnimationsPreview";
 import { TypographySection } from "./TypographySettings";
 import { ThreadDetailsItemsRow } from "./ThreadDetailsItemsRow";
+import { BackgroundSettings } from "./BackgroundSettings";
 
 const ENVIRONMENT_IDENTIFICATION_LABELS: Record<EnvironmentIdentificationMode, string> = {
   artwork: msg("Artwork"),
@@ -166,6 +167,8 @@ export function AppearanceSettingsPanel() {
           />
         </div>
       </SettingsSection>
+
+      <BackgroundSettings />
 
       <SettingsSection id="appearance-interface" title={gt("Interface")}>
         <SettingsRow

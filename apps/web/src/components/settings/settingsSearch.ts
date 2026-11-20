@@ -340,6 +340,18 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "appearance",
   },
   {
+    id: "background-image",
+    title: msg("Background image"),
+    to: "/settings/appearance",
+    searchTerms: [msg("picture wallpaper upload blur transparent")],
+  },
+  {
+    id: "background-image-colors",
+    title: msg("Use colors from image"),
+    to: "/settings/appearance",
+    searchTerms: [msg("picture wallpaper tint palette")],
+  },
+  {
     // Prefixed because the slider control already owns the `appearance-contrast` id.
     id: "setting-appearance-contrast",
     title: msg("Contrast"),

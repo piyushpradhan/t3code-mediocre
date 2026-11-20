@@ -35,6 +35,7 @@ import { appAtomRegistry, subscribeAtomChanges } from "./rpc/atomRegistry";
 import { applyThemeBackground } from "./themeBackground";
 import { applyThemeCss } from "./themeCss";
 import { themeServerEnvironmentThemesAtom } from "./state/server";
+import { getAppearanceBackground } from "./appearanceBackground";
 
 export { EMBER_THEME, GROVE_THEME, IRIS_THEME, OCEAN_THEME, T3_CHAT_THEME, THEME_COLOR_ROLES };
 export type { ThemeAppearance, ThemeColorRole, ThemeColors, ThemeDefinition, ThemeVariants };
@@ -1748,13 +1749,35 @@ export function applyThemePalette(theme: ThemePreference, appearance?: ThemeAppe
 
   setThemePreviewAppearance(null);
   const palette = getThemeDefinition(theme);
+  const background = getAppearanceBackground();
+  if (background) {
+    root.dataset.appearanceBackground = "true";
+    root.style.setProperty("--appearance-background-image", `url("${background.dataUrl}")`);
+  } else {
+    delete root.dataset.appearanceBackground;
+    root.style.removeProperty("--appearance-background-image");
+  }
   applyThemeCss(palette?.css);
   applyThemeBackground(palette?.id);
 
-  if (palette) {
-    root.dataset.themeId = palette.id;
-    const mode = appearance ?? legacyThemeMode(theme) ?? palette.appearance;
-    const colors = getThemeColorsForMode(palette, mode) ?? palette.colors;
+  const mode = appearance ?? legacyThemeMode(theme) ?? palette?.appearance ?? "light";
+  const colors = background?.useColors
+    ? createVividThemeColors(
+        mode,
+        themeRgbToThemeColor(
+          mixThemeRgbColors(
+            parseThemeRgbColor(background.accent, { r: 128, g: 128, b: 128 }),
+            mode === "dark" ? { r: 0, g: 0, b: 0 } : { r: 255, g: 255, b: 255 },
+            mode === "dark" ? 0.86 : 0.94,
+          ),
+        ),
+        background.accent,
+      )
+    : palette
+      ? (getThemeColorsForMode(palette, mode) ?? palette.colors)
+      : null;
+  if (colors) {
+    root.dataset.themeId = palette?.id ?? "image-background";
     for (const [role, value] of Object.entries(colors) as Array<[ThemeColorRole, string]>) {
       root.style.setProperty(APP_THEME_VARIABLES[role], value);
     }
