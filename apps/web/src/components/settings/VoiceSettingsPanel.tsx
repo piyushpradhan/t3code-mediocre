@@ -1,3 +1,4 @@
+import { useAtomValue } from "@effect/atom-react";
 import {
   cancelEnvironmentSpeechModelDownload,
   downloadEnvironmentSpeechModel,
@@ -80,7 +81,8 @@ import { useEnvironmentProviders, useEnvironments } from "../../state/environmen
 import { useEnvironmentScope } from "../../state/session";
 import { reportSpeechFailure, speak, stopSpeaking } from "../../speech/spokenReplies";
 import { unlockNotificationAudio } from "../../threadNotifications";
-import { EMPTY_SERVER_PROVIDERS } from "../../state/server";
+import { EMPTY_SERVER_PROVIDERS, primaryServerKeybindingsAtom } from "../../state/server";
+import { shortcutLabelForCommand } from "../../keybindings";
 import {
   useEnvironmentSpeechInput,
   useVoiceTranscriptionDestination,
@@ -1293,6 +1295,10 @@ function TranscriptionTest(props: {
 export function VoiceSettingsPanel() {
   const cleanupEnabled = useCleanupGrant() !== null;
   const settings = useClientSettings();
+  const dictationShortcut = shortcutLabelForCommand(
+    useAtomValue(primaryServerKeybindingsAtom),
+    "composer.dictation",
+  );
   const settingsScope = useOptionalSettingsScope();
   const destination = useVoiceTranscriptionDestination();
   const canManageKey = useEnvironmentScope(destination.environmentId, AuthSettingsWriteScope);
@@ -1389,6 +1395,37 @@ export function VoiceSettingsPanel() {
       }}
     >
       <SettingsSection id="voice-input" title="Input">
+        <SettingsRow
+          {...searchableSetting("voice-assistant")}
+          title="Voice assistant shortcut"
+          description={`${dictationShortcut ? `Press ${dictationShortcut}` : "The Voice: Start or Finish Recording shortcut (unassigned; set one in Settings → Keybindings)"} anywhere in the app to record, then press it again to send a new No project thread. Say ‘In project [name], …’ to choose a project. Turn off to dictate into the focused editor instead.`}
+          devicePreference
+          control={
+            <Switch
+              aria-label="Voice assistant shortcut"
+              checked={settings.voiceAssistantEnabled}
+              onCheckedChange={(checked) =>
+                void updateClientSettings({ voiceAssistantEnabled: checked })
+              }
+            />
+          }
+        />
+        <SettingsRow
+          {...searchableSetting("voice-assistant-memory")}
+          title="Persistent memory"
+          description="Instructions included with every voice assistant request. Defaults to Notion; change this to use another memory source. The agent needs access to that source. Leave empty to disable."
+          devicePreference
+        >
+          <div className="mt-3 pb-2">
+            <Textarea
+              aria-label="Voice assistant memory instructions"
+              value={settings.voiceAssistantMemoryInstructions}
+              onChange={(event) =>
+                void updateClientSettings({ voiceAssistantMemoryInstructions: event.target.value })
+              }
+            />
+          </div>
+        </SettingsRow>
         <SettingsRow
           {...searchableSetting("voice-microphone")}
           title="Microphone"

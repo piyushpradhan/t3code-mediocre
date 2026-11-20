@@ -43,6 +43,7 @@ import { useQueuedRunEdit } from "./chat/useQueuedRunEdit";
 import { recallCheckoutIsRepo, rememberCheckoutIsRepo } from "./ChatView.logic";
 import { useLogicalProjectEnvironments } from "../hooks/useLogicalProjectEnvironments";
 import { useStableCallback } from "../hooks/useStableCallback";
+import { takeVoiceAutoSend, useVoiceAutoSend } from "../speech/voiceAssistant.logic";
 import { useProjectScriptEditing } from "./chat/useProjectScriptEditing";
 import { RightPanelSurfaceContent } from "./chat/RightPanelSurfaceContent";
 import { usePendingThreadRequests } from "./chat/usePendingThreadRequests";
@@ -3125,6 +3126,20 @@ export default function ChatView(props: ChatViewProps) {
     setDraftThreadContext,
     workLocallyResendReady,
   ]);
+  const voiceAutoSendReady =
+    useVoiceAutoSend(draftId) &&
+    isLocalDraftThread &&
+    !isSendBusy &&
+    !threadDetailLoading &&
+    clientSettingsHydrated &&
+    !needsLoadBalancing &&
+    !activeEnvironmentUnavailable &&
+    !activePendingUserInput;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- sends a voice assistant draft once, as soon as its composer can send
+  useEffect(() => {
+    if (!voiceAutoSendReady || !draftId || sendInFlightRef.current) return;
+    if (takeVoiceAutoSend(draftId)) void onComposerSendStable();
+  }, [draftId, onComposerSendStable, sendInFlightRef, voiceAutoSendReady]);
 
   const shownThreadSyncPhase = activeEnvironmentUnavailable ? null : delayedThreadSyncPhase;
   const hasThreadNow =

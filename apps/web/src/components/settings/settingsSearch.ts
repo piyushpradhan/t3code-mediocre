@@ -554,6 +554,18 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["mic input audio device order priority preferred"],
   },
   {
+    id: "voice-assistant",
+    title: "Voice assistant shortcut",
+    to: "/settings/voice",
+    searchTerms: ["no project scratch global keyboard dictation mod+shift+d hotkey keybinding"],
+  },
+  {
+    id: "voice-assistant-memory",
+    title: "Persistent memory",
+    to: "/settings/voice",
+    searchTerms: ["voice assistant notion instructions context"],
+  },
+  {
     id: "dictation-shortcut-mode",
     title: "Dictation shortcut",
     to: "/settings/voice",

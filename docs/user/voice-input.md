@@ -78,8 +78,25 @@ while you record; models with built-in long-form support transcribe when you sto
 
 ## Dictate
 
-Press the microphone in the composer, or `mod+shift+d` (`mod` is Command on
-macOS and Ctrl elsewhere). Press again, or the check mark, to finish; `Esc`
+On web and desktop, `mod+shift+d` (`mod` is Command on macOS and Ctrl elsewhere)
+starts the voice assistant from anywhere in the app. Finish recording to start
+and send a new **No project** thread, regardless of the chat you were viewing. To choose a
+project, begin with “In project [name], …” or “For project [name], …”, using its
+name in T3 Code. Unknown or duplicate names show an error with your transcript
+for copying or retrying. **Settings → Voice → Voice assistant shortcut** shows
+your current chord.
+
+Under **Settings → Voice → Persistent memory**, edit the instructions included
+with every voice assistant request. They ask the agent to read your Notion memory
+by default. The selected agent must have access to that memory source; this setting
+does not connect an account. You can replace the instructions for another source
+or clear them to disable memory. These preferences are saved on this device.
+
+Turn off **Voice assistant shortcut** in Voice settings to have the shortcut
+dictate into the focused editor, or the composer when none has focus. Pressing a
+microphone always dictates into that editor, including when the assistant is on.
+
+Press the microphone in the composer to dictate there. Press it again, or the check mark, to finish; `Esc`
 discards the recording and leaves your draft unchanged. Recordings last up to
 five minutes. Text is inserted at the cursor or replaces the selection you had
 when recording started, and the editor is read-only while dictation runs.
@@ -89,8 +106,8 @@ the text then goes after your selection instead of replacing it.
 Pressing Send while dictating finishes the recording and sends the draft once
 the transcript has been inserted. Cancelling also cancels that queued send. In
 the other editors, Save, Comment, Reply, Submit review, or Attach works the
-same way, and the shortcut targets the editor that has focus, or the composer
-when none does. In the desktop browser's annotation editor, the microphone and
+same way. With the assistant shortcut off, it targets the editor that has focus,
+or the composer when none does. In the desktop browser's annotation editor, the microphone and
 the shortcut work while the page has focus; the page you are annotating never
 sees the recording, which runs in T3 Code itself.
 
@@ -146,10 +163,12 @@ the model hears the cue as a dictionary hint.
 
 To talk with an agent hands-free, dictate your message and have the reply read
 back. In **Settings → Voice → Spoken replies**, turn on **Read replies aloud**.
-When the thread you have open finishes a run, this device plays the reply. Code
-blocks, tables, and link addresses are skipped, and a long reply is read up to
-about a minute. Starting a new dictation, or **Stop** on the notice that shows
-while audio plays, ends playback. The switch is saved on this device only.
+When the thread you have open finishes a run, this device plays the reply. A
+long reply is spoken as a sentence or two that sums it up, written by your voice
+cleanup model; code blocks, tables, and link addresses are skipped. In the desktop
+app, the reply plays in a floating panel at the bottom right of your screen, above
+other apps, with a live audio visualizer; in a browser, a notice shows instead.
+Starting a new dictation, or **Stop** on the panel or notice, ends playback. The switch is saved on this device only.
 
 Speech comes from a server you choose, set per environment under **Speech
 server**. Any server with an OpenAI-compatible speech API works: a local

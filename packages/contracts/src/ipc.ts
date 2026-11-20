@@ -1062,6 +1062,9 @@ export interface DesktopBridge {
   getPathForFile: (file: File) => string;
   getClientPlatform: () => string;
   restartAudioService?: () => Promise<boolean>;
+  /** Plays a spoken reply in a floating panel with a visualizer and a stop button. */
+  playVoiceReply?: (audio: Uint8Array) => Promise<void>;
+  stopVoiceReply?: () => Promise<void>;
   setNotificationBadge: (badge: { count: number; image: string | null }) => Promise<void>;
   onNotificationBadgeClear: (listener: () => void) => () => void;
   onTrackpadScrollBegin: (listener: () => void) => () => void;

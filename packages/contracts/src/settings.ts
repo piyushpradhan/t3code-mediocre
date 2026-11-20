@@ -570,6 +570,14 @@ export const ClientSettingsSchema = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
   voiceShortcutMode: VoiceShortcutMode.pipe(Schema.withDecodingDefault(Effect.succeed("auto"))),
+  voiceAssistantEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  voiceAssistantMemoryInstructions: Schema.String.pipe(
+    Schema.withDecodingDefault(
+      Effect.succeed(
+        "Before responding, retrieve relevant context from my persistent memory in Notion using the connected Notion tools. Use that context and my saved preferences when handling my request. If memory is unavailable, tell me; do not claim to have read it.",
+      ),
+    ),
+  ),
   /** This device reads the open thread's reply aloud when its run completes. */
   speakReplies: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   speechLanguage: SpeechLanguage.pipe(Schema.withDecodingDefault(Effect.succeed("auto"))),
@@ -2119,6 +2127,8 @@ export const ClientSettingsPatch = Schema.Struct({
   voiceMicrophone: Schema.optionalKey(Schema.String),
   voiceMicrophones: Schema.optionalKey(Schema.Array(VoiceMicrophoneEntry)),
   voiceShortcutMode: Schema.optionalKey(VoiceShortcutMode),
+  voiceAssistantEnabled: Schema.optionalKey(Schema.Boolean),
+  voiceAssistantMemoryInstructions: Schema.optionalKey(Schema.String),
   speakReplies: Schema.optionalKey(Schema.Boolean),
   speechLanguage: Schema.optionalKey(SpeechLanguage),
   speechTranslateToEnglish: Schema.optionalKey(Schema.Boolean),

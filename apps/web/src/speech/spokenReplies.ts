@@ -20,6 +20,7 @@ export function stopSpeaking() {
   generation += 1;
   playing?.stop();
   playing = undefined;
+  void window.desktopBridge?.stopVoiceReply?.().catch(() => undefined);
 }
 
 /**
@@ -32,11 +33,16 @@ export async function speak(
 ): Promise<void> {
   stopSpeaking();
   const mine = generation;
-  const context = unlockedAudioContext();
+  const floating = window.desktopBridge?.playVoiceReply;
+  const context = floating ? null : unlockedAudioContext();
   const prepared = readPreparedConnection(environmentId);
-  if (!context) throw new Error("This browser hasn’t allowed audio yet. Click the page first.");
+  if (!floating && !context)
+    throw new Error("This browser hasn’t allowed audio yet. Click the page first.");
   if (!prepared) throw new Error("The environment isn’t connected.");
   const audio = await runEnvironmentSpeech(synthesizeEnvironmentSpeech(prepared, request));
+  if (mine !== generation) return;
+  if (floating) return floating(audio);
+  if (!context) return;
   const buffer = await context.decodeAudioData(audio.slice().buffer);
   if (mine !== generation) return;
   const source = context.createBufferSource();

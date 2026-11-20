@@ -1,5 +1,6 @@
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it } from "@effect/vitest";
-import { RunId, ThreadId } from "@t3tools/contracts";
+import { RunId, TextGenerationError, ThreadId } from "@t3tools/contracts";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -7,6 +8,7 @@ import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import { expect, vi } from "vite-plus/test";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import * as TextGeneration from "../textGeneration/TextGeneration.ts";
 import * as SpeechSynthesis from "./SpeechSynthesis.ts";
 
 it.effect("speaks a run's last reply through the configured server only", () => {
@@ -18,6 +20,9 @@ it.effect("speaks a run's last reply through the configured server only", () => 
         { text: "  " },
       ],
     }),
+  );
+  const generateTranscriptionPostProcessing = vi.fn((_input: { prompt: string }) =>
+    Effect.succeed({ transcription: "I fixed the **auth** bug, so you can sign in again." }),
   );
   return Effect.gen(function* () {
     const upstream = vi.fn<typeof fetch>(async () => new Response(new Uint8Array([1, 2, 3])));
@@ -48,16 +53,30 @@ it.effect("speaks a run's last reply through the configured server only", () => 
     expect(init?.redirect).toBe("error");
     expect(new Headers(init?.headers).has("authorization")).toBe(false);
     expect(JSON.parse(new TextDecoder().decode(init?.body as Uint8Array))).toEqual({
-      input: "Fixed auth.ts.",
+      input: "I fixed the auth bug, so you can sign in again.",
       response_format: "mp3",
       model: "kokoro",
       voice: "af_heart",
     });
+    expect(generateTranscriptionPostProcessing.mock.calls[0]![0].prompt).toContain("const secret");
+
+    generateTranscriptionPostProcessing.mockReturnValueOnce(
+      Effect.fail(
+        new TextGenerationError({
+          operation: "generateTranscriptionPostProcessing",
+          detail: "down",
+        }),
+      ) as never,
+    );
+    yield* speak();
+    expect(
+      JSON.parse(new TextDecoder().decode(upstream.mock.calls[1]![1]?.body as Uint8Array)).input,
+    ).toBe("Fixed auth.ts.");
 
     yield* settings.updateSettings({ cloudSpeechCredentials: { synthesis: "chosen" } });
     upstream.mockResolvedValueOnce(new Response("upstream diagnostic", { status: 401 }));
     expect(yield* failure({ text: "Hello." })).toBe("rejected-key");
-    expect(new Headers(upstream.mock.calls[1]![1]?.headers).get("authorization")).toBe(
+    expect(new Headers(upstream.mock.calls[2]![1]?.headers).get("authorization")).toBe(
       "Bearer chosen",
     );
   }).pipe(
@@ -65,6 +84,12 @@ it.effect("speaks a run's last reply through the configured server only", () => 
       SpeechSynthesis.layer.pipe(
         Layer.provideMerge(ServerSettings.ServerSettingsService.layerTest()),
         Layer.provide(FetchHttpClient.layer),
+        Layer.provide(NodeServices.layer),
+        Layer.provide(
+          Layer.mock(TextGeneration.TextGeneration)({
+            generateTranscriptionPostProcessing: generateTranscriptionPostProcessing as never,
+          }),
+        ),
         Layer.provide(Layer.mock(SecretResolver.SecretResolver)({})),
         Layer.provide(
           Layer.mock(ThreadManagementService.ThreadManagementService)({

@@ -35,6 +35,7 @@ type ShortcutInput = {
   modelPickerOpen: boolean;
   /** Resolve the chord as if the preview had focus; the keys arrive relayed from its guest. */
   previewFocus?: boolean;
+  assistant?: boolean;
   /** When set, the chord targets this editor only while it has focus. */
   targetRef?: RefObject<HTMLElement | null>;
   /** An editor outside this document reports whether it holds the keyboard. */
@@ -43,7 +44,7 @@ type ShortcutInput = {
   subscribeKeys?: (handlers: DictationKeyHandlers) => () => void;
 };
 
-// Several editors can bind the chord; the busy one, then the focused one, then the untargeted one wins.
+// The busy recording wins, then the assistant, the focused editor, and the composer.
 const shortcutTargets = new Map<symbol, () => ShortcutInput>();
 
 function ownsShortcut(id: symbol) {
@@ -53,6 +54,8 @@ function ownsShortcut(id: symbol) {
     return phase !== "idle" && phase !== "error";
   });
   if (busy) return busy[0] === id;
+  const assistant = entries.find(([, read]) => read().assistant);
+  if (assistant) return assistant[0] === id;
   const focused =
     entries.find(([, read]) => read().ownsFocus?.()) ??
     entries.find(([, read]) => read().targetRef?.current?.contains(document.activeElement));
@@ -89,6 +92,7 @@ export function useDictationShortcut(input: ShortcutInput) {
   const id = useRef(Symbol("dictation-target"));
   const subscribeKeys = input.subscribeKeys;
   const mode = useClientSettings((settings) => settings.voiceShortcutMode);
+  const assistantEnabled = useClientSettings((settings) => settings.voiceAssistantEnabled);
   const current = useRef(input);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- publishes committed actions to the window keyboard listener and shortcut registry
   useEffect(() => {
@@ -200,6 +204,8 @@ export function useDictationShortcut(input: ShortcutInput) {
     };
   }, [mode, subscribeKeys]);
 
+  if (assistantEnabled && !input.assistant && ["idle", "error"].includes(input.speech.state.phase))
+    return null;
   return shortcutLabelForCommand(input.keybindings, "composer.dictation", {
     context: { terminalFocus: false, terminalOpen: input.terminalOpen },
   });

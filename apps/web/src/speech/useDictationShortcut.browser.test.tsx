@@ -5,7 +5,14 @@ import { render } from "../../test/render";
 import { useDictationShortcut, type DictationKeyHandlers } from "./useDictationShortcut";
 
 const settings = vi.hoisted(() => ({ mode: "hold" as "hold" | "auto" | "toggle" }));
-vi.mock("../hooks/useSettings", () => ({ useClientSettings: () => settings.mode }));
+vi.mock("../hooks/useSettings", () => ({
+  useClientSettings: (
+    select: (value: {
+      voiceShortcutMode: typeof settings.mode;
+      voiceAssistantEnabled: boolean;
+    }) => unknown,
+  ) => select({ voiceShortcutMode: settings.mode, voiceAssistantEnabled: false }),
+}));
 
 type ShortcutInput = Parameters<typeof useDictationShortcut>[0];
 
@@ -13,10 +20,12 @@ function Probe({
   speech,
   targetRef,
   subscribeKeys,
+  assistant,
 }: {
   speech: ShortcutInput["speech"];
   targetRef?: RefObject<HTMLElement | null>;
   subscribeKeys?: ShortcutInput["subscribeKeys"];
+  assistant?: boolean;
 }) {
   useDictationShortcut({
     keybindings: DEFAULT_RESOLVED_KEYBINDINGS,
@@ -26,6 +35,7 @@ function Probe({
     modelPickerOpen: false,
     ...(targetRef ? { targetRef } : {}),
     ...(subscribeKeys ? { subscribeKeys, ownsFocus: () => true } : {}),
+    ...(assistant ? { assistant } : {}),
   });
   return null;
 }
@@ -124,6 +134,35 @@ const escape = () =>
 const recording = () => ({
   ...actions(true),
   state: { phase: "recording" as const, error: null, errorAction: null },
+});
+
+it("starts the assistant ahead of a focused editor, but lets an existing recording finish", async () => {
+  const assistant = actions(true);
+  const editor = actions(true);
+  const targetRef = createRef<HTMLTextAreaElement>();
+  await using screen = await render(
+    <>
+      <Probe speech={editor} targetRef={targetRef} />
+      <textarea aria-label="Focused draft" ref={targetRef} />
+      <Probe speech={assistant} assistant />
+    </>,
+  );
+  targetRef.current?.focus();
+  press();
+  expect(assistant.start).toHaveBeenCalledOnce();
+  expect(editor.start).not.toHaveBeenCalled();
+  await screen.rerender(
+    <>
+      <Probe
+        speech={{ ...editor, state: { ...editor.state, phase: "recording" } }}
+        targetRef={targetRef}
+      />
+      <textarea aria-label="Focused draft" ref={targetRef} />
+      <Probe speech={assistant} assistant />
+    </>,
+  );
+  press();
+  expect(editor.stop).toHaveBeenCalledOnce();
 });
 
 it("lets Escape in another dictation editor reach that editor instead of canceling the recording", async () => {

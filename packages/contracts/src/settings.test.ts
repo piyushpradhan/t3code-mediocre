@@ -509,6 +509,17 @@ describe("requiredScopesForProjectMutation", () => {
 });
 
 describe("voice settings", () => {
+  it("defaults the assistant to Notion and persists custom memory or focused-editor dictation", () => {
+    expect(decodeClientSettings({}).voiceAssistantEnabled).toBe(true);
+    expect(decodeClientSettings({}).voiceAssistantMemoryInstructions).toContain("Notion");
+    for (const voiceAssistantMemoryInstructions of ["Use my local memory files.", ""]) {
+      const patch = { voiceAssistantEnabled: false, voiceAssistantMemoryInstructions };
+      expect(decodeClientSettingsPatch(patch)).toEqual(patch);
+      expect(decodeClientSettings(encodeClientSettings(decodeClientSettings(patch)))).toMatchObject(
+        patch,
+      );
+    }
+  });
   it("does not import voice consent from ordinary device preferences", () => {
     const imported = {
       voiceTranscriptionEnvironmentId: "env-1",
