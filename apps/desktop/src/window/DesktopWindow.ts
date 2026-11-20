@@ -844,8 +844,16 @@ export const make = Effect.gen(function* () {
     window.on("move", scheduleBoundsPersist);
     window.on("maximize", scheduleBoundsPersist);
     window.on("unmaximize", scheduleBoundsPersist);
-    window.on("close", () => {
+    window.on("close", (event) => {
       runFork(flushBoundsPersist);
+      // The menu bar's voice shortcuts record in this renderer, so closing hides it until quit.
+      if (
+        environment.platform === "darwin" &&
+        !Effect.runSyncWith(context)(Ref.get(desktopState.quitting))
+      ) {
+        event.preventDefault();
+        window.hide();
+      }
     });
 
     if (environment.platform === "darwin") {

@@ -6,7 +6,7 @@ import * as DesktopIpc from "./DesktopIpc.ts";
 import { installNotificationBadge } from "./methods/notificationBadge.ts";
 import {
   hideVoiceRecording,
-  installVoiceReplyShortcut,
+  installVoiceShortcuts,
   playVoiceReply,
   showVoiceRecording,
   stopVoiceReply,
@@ -126,7 +126,7 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handle(showVoiceRecording);
   yield* ipc.handle(updateVoiceRecording);
   yield* ipc.handle(hideVoiceRecording);
-  yield* installVoiceReplyShortcut();
+  yield* installVoiceShortcuts();
   yield* ipc.handle(getClientSettings);
   yield* ipc.handle(setClientSettings);
   yield* ipc.handle(getConnectionCatalog);

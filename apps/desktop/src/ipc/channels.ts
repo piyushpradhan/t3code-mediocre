@@ -8,6 +8,7 @@ export const UPDATE_VOICE_RECORDING_CHANNEL = "desktop:update-voice-recording";
 export const HIDE_VOICE_RECORDING_CHANNEL = "desktop:hide-voice-recording";
 export const VOICE_RECORDING_STOP_CHANNEL = "desktop:voice-recording-stop";
 export const VOICE_REPLY_SHORTCUT_CHANNEL = "desktop:voice-reply-shortcut";
+export const VOICE_ASSISTANT_SHORTCUT_CHANNEL = "desktop:voice-assistant-shortcut";
 export const PICK_PROJECT_FAVICON_CHANNEL = "desktop:pick-project-favicon";
 export const PICK_THEME_FILES_CHANNEL = "desktop:pick-theme-files";
 export const SET_THEME_CHANNEL = "desktop:set-theme";

@@ -130,6 +130,11 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     ipcRenderer.on(IpcChannels.VOICE_REPLY_SHORTCUT_CHANNEL, handler);
     return () => ipcRenderer.removeListener(IpcChannels.VOICE_REPLY_SHORTCUT_CHANNEL, handler);
   },
+  onVoiceAssistantShortcut: (listener) => {
+    const handler = () => listener();
+    ipcRenderer.on(IpcChannels.VOICE_ASSISTANT_SHORTCUT_CHANNEL, handler);
+    return () => ipcRenderer.removeListener(IpcChannels.VOICE_ASSISTANT_SHORTCUT_CHANNEL, handler);
+  },
   onVoiceRecordingStop: (listener) => {
     const handler = () => listener();
     ipcRenderer.on(IpcChannels.VOICE_RECORDING_STOP_CHANNEL, handler);

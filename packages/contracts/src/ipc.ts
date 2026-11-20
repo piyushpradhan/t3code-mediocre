@@ -1101,6 +1101,8 @@ export interface DesktopBridge {
   hideVoiceRecording?: () => Promise<void>;
   /** The system-wide reply chord was pressed, even while another app had focus. */
   onVoiceReplyShortcut?: (listener: () => void) => () => void;
+  /** The system-wide new voice request chord, or its menu bar item, was used. */
+  onVoiceAssistantShortcut?: (listener: () => void) => () => void;
   /** Finish was pressed on the floating recording panel. */
   onVoiceRecordingStop?: (listener: () => void) => () => void;
   setNotificationBadge: (badge: { count: number; image: string | null }) => Promise<void>;

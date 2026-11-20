@@ -98,6 +98,13 @@ you are replying to. Your answer is sent to the thread that spoke, opening it if
 needed. If that thread has an unsent draft, the answer is
 not sent and stays in the error notice for copying.
 
+On macOS, the desktop app adds a microphone to the menu bar and listens for two
+chords from any app: `ctrl+option+shift+v` starts a new voice request and
+`ctrl+option+shift+r` replies to a spoken reply. Press the chord again, or
+**Finish** on the floating panel, to send. Closing the window keeps T3 Code
+running in the menu bar so these keep working; quit from the menu bar or with
+`cmd+q`.
+
 Under **Settings → Voice → Persistent memory**, edit the instructions included
 with every voice assistant request. They ask the agent to read your Notion memory
 by default. The selected agent must have access to that memory source; this setting

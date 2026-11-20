@@ -5,6 +5,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 import * as ElectronWindow from "../../electron/ElectronWindow.ts";
+import * as DesktopWindow from "../../window/DesktopWindow.ts";
 import * as DesktopIpc from "../DesktopIpc.ts";
 import {
   HIDE_VOICE_RECORDING_CHANNEL,
@@ -12,6 +13,7 @@ import {
   SHOW_VOICE_RECORDING_CHANNEL,
   STOP_VOICE_REPLY_CHANNEL,
   UPDATE_VOICE_RECORDING_CHANNEL,
+  VOICE_ASSISTANT_SHORTCUT_CHANNEL,
   VOICE_RECORDING_STOP_CHANNEL,
   VOICE_REPLY_SHORTCUT_CHANNEL,
 } from "../channels.ts";
@@ -20,8 +22,13 @@ const WIDTH = 252;
 const HEIGHT = 52;
 const RECORDING_WIDTH = 300;
 const MARGIN = 16;
-// Rarely bound by other apps, so registering it system-wide steals nothing common.
+// Rarely bound by other apps, so registering them system-wide steals nothing common.
 const REPLY_ACCELERATOR = "Control+Alt+Shift+R";
+const ASSISTANT_ACCELERATOR = "Control+Alt+Shift+V";
+const TRAY_ICON = [
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAyklEQVR4nKySQQrCMBBFm+pWdOUFXHsBN7bXELr3EqJexr1eoJ5AF15AcCeI6FrRH/iBJMykBf3wmDQzf5g0ybMf1UnkhmAOJuACnlKRSZhPjFZXMGYMlCsNKs/sGlZSYVf2Z72We+oErfX3Bh9QNHiCGu0fHIS9I1hxvdcmsIkl2IEFeBG73oIpWPuG+B0UoGajMsrVzJeZN4H0kFwTqzN4gxG/A7N0BHcMw1FvYECjic3aBL42jDOtQLsFJ3tl91RB0wR9xodW8AUAAP//PTYkWAAAAAZJREFUAwCGnyGODoDGgAAAAABJRU5ErkJggg==",
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABcklEQVR4nOyWQU7DMBBFfwsSR0BCArHkFrhXQMCaG7CAfcuGbmADJ2AN4gaoRhVHYMOOPWdomCGTZoqw44kjVUh50ldG1ow9mXFiD7Fmhlgz/zaBY9KctBDNZczMBuxck+5Ie6SBiO1T0hbpxTDXT7AFfsvHBp8T0hMSsbbgvCOfJdYKLBJiChhebBM2Bh35LOn/A30CsQQcusGhRQKONEP5STnkLR6dJ6UFTtlFgn8RiHVomcChst8S/EM+/q/B2E+jUIEjsa1nQdG0VqwCXp4Odfl44mkkZop68YkavwoFxI7jT9KZ2PukB7H5uH0n7ZB2ZYzLfkG6V/EzZb+iRQuqSZzYHnUrmtBx/PaTkGPTJtSlcyh7Oon4u1+LMz7in3RyOayWs4KTOxB7W/lqRl0kUE3MGif6e5QJ+ibH1PuAx+pk49yFK6w3Is0Nyp3P3JIu0QLrjUjzEbBN9PeBnBZ8BWwTOZuQOZLnM1qSm0A23wAAAP//W3Dv8wAAAAZJREFUAwCKhEBHynsVWwAAAABJRU5ErkJggg==",
+] as const;
 
 const RECORDING_HTML = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'">
 <style>
@@ -237,6 +244,8 @@ export const showVoiceRecording = DesktopIpc.makeIpcMethod({
   result: Schema.Void,
   handler: Effect.fn("desktop.ipc.voiceReply.showRecording")(function* (description, event) {
     if (!(yield* fromMainWindow(event))) return;
+    // A hidden main window would throttle the timers that stream the recording.
+    if (event) Electron.webContents.fromId(event.sender.id)?.setBackgroundThrottling(false);
     const platform = yield* HostProcess.Platform;
     yield* Effect.tryPromise({
       try: () => openRecording(description, platform),
@@ -262,26 +271,70 @@ export const hideVoiceRecording = DesktopIpc.makeIpcMethod({
   payload: Schema.Void,
   result: Schema.Void,
   handler: Effect.fn("desktop.ipc.voiceReply.hideRecording")(function* (_payload, event) {
-    if (yield* fromMainWindow(event)) closeRecording();
+    if (!(yield* fromMainWindow(event))) return;
+    closeRecording();
+    if (event) Electron.webContents.fromId(event.sender.id)?.setBackgroundThrottling(true);
   }),
 });
 
-/** A system-wide chord that forwards to the app, so a spoken reply can be answered from any app. */
-export const installVoiceReplyShortcut = Effect.fn("desktop.ipc.installVoiceReplyShortcut")(
-  function* () {
-    yield* Effect.sync(() =>
-      Electron.globalShortcut.register(REPLY_ACCELERATOR, () =>
-        sendToWindows(VOICE_REPLY_SHORTCUT_CHANNEL),
-      ),
+let tray: Electron.Tray | undefined;
+
+function createTray(revealApp: () => void) {
+  const icon = Electron.nativeImage.createEmpty();
+  TRAY_ICON.forEach((dataURL, index) =>
+    icon.addRepresentation({ scaleFactor: index + 1, dataURL }),
+  );
+  icon.setTemplateImage(true);
+  tray = new Electron.Tray(icon);
+  tray.setToolTip("T3 Code voice");
+  tray.setContextMenu(
+    Electron.Menu.buildFromTemplate([
+      {
+        label: "Start Voice Request",
+        accelerator: ASSISTANT_ACCELERATOR,
+        registerAccelerator: false,
+        click: () => sendToWindows(VOICE_ASSISTANT_SHORTCUT_CHANNEL),
+      },
+      {
+        label: "Reply to Spoken Reply",
+        accelerator: REPLY_ACCELERATOR,
+        registerAccelerator: false,
+        click: () => sendToWindows(VOICE_REPLY_SHORTCUT_CHANNEL),
+      },
+      { type: "separator" },
+      { label: "Open T3 Code", click: revealApp },
+      { label: "Quit T3 Code", click: () => Electron.app.quit() },
+    ]),
+  );
+}
+
+/**
+ * System-wide voice chords and a menu bar item that forward to the app, so a request or a reply
+ * can start from any app. The main window hides on close on macOS, so its renderer stays to record.
+ */
+export const installVoiceShortcuts = Effect.fn("desktop.ipc.installVoiceShortcuts")(function* () {
+  const desktopWindow = yield* DesktopWindow.DesktopWindow;
+  const platform = yield* HostProcess.Platform;
+  const runFork = Effect.runForkWith(yield* Effect.context<never>());
+  yield* Effect.sync(() => {
+    Electron.globalShortcut.register(ASSISTANT_ACCELERATOR, () =>
+      sendToWindows(VOICE_ASSISTANT_SHORTCUT_CHANNEL),
     );
-    yield* Effect.addFinalizer(() =>
-      Effect.sync(() => {
-        Electron.globalShortcut.unregister(REPLY_ACCELERATOR);
-        closeRecording();
-      }),
+    Electron.globalShortcut.register(REPLY_ACCELERATOR, () =>
+      sendToWindows(VOICE_REPLY_SHORTCUT_CHANNEL),
     );
-  },
-);
+    if (platform === "darwin") createTray(() => void runFork(desktopWindow.revealOrCreateMain));
+  });
+  yield* Effect.addFinalizer(() =>
+    Effect.sync(() => {
+      Electron.globalShortcut.unregister(ASSISTANT_ACCELERATOR);
+      Electron.globalShortcut.unregister(REPLY_ACCELERATOR);
+      tray?.destroy();
+      tray = undefined;
+      closeRecording();
+    }),
+  );
+});
 
 export const stopVoiceReply = DesktopIpc.makeIpcMethod({
   channel: STOP_VOICE_REPLY_CHANNEL,

@@ -48,6 +48,8 @@ function VoiceAssistantSession({ environmentId }: { environmentId: EnvironmentId
   const gt = useGT();
   const [opening, setOpening] = useState(false);
   const [replyTo, setReplyTo] = useState<SpokenReply>();
+  // Started from the menu bar or a system-wide chord, so it records in the floating panel.
+  const [startedOutside, setStartedOutside] = useState(false);
   const openTranscript = useStableCallback(function openTranscript(
     text: string,
     target: SpokenReply | undefined = replyTo,
@@ -142,57 +144,66 @@ function VoiceAssistantSession({ environmentId }: { environmentId: EnvironmentId
   const recordingActive =
     opening || (speech.state.phase !== "idle" && speech.state.phase !== "error");
   const sending = opening || speech.state.phase === "transcribing";
-  const floatingReply =
-    replyTo !== undefined && window.desktopBridge?.showVoiceRecording !== undefined;
-  const pressReply = useStableCallback(() => {
+  const floating =
+    window.desktopBridge?.showVoiceRecording !== undefined &&
+    (replyTo !== undefined || startedOutside);
+  const pressOutside = useStableCallback((command: KeybindingCommand) => {
     if (speech.state.phase === "recording") return void speech.stop();
-    if (recordingActive || !speech.available) return;
-    if (beforeStart("voice.reply")) void speech.start();
+    if (recordingActive || !speech.available || !beforeStart(command)) return;
+    setStartedOutside(true);
+    void speech.start();
   });
   const finishFromPanel = useStableCallback(() => {
     if (speech.state.phase === "recording") void speech.stop();
     else if (speech.state.phase === "preparing") speech.cancel();
   });
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to the desktop's system-wide reply chord and the floating panel's Finish button
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to the desktop's system-wide voice chords, menu bar items, and the floating panel's Finish button
   useEffect(() => {
     const bridge = window.desktopBridge;
-    const offShortcut = bridge?.onVoiceReplyShortcut?.(pressReply);
-    const offFinish = bridge?.onVoiceRecordingStop?.(finishFromPanel);
-    return () => {
-      offShortcut?.();
-      offFinish?.();
-    };
-  }, [finishFromPanel, pressReply]);
-  const panelReply = floatingReply && recordingActive ? replyTo : undefined;
-  const describePanel = useStableCallback(describeReply);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- shows the desktop's floating recording panel while a reply records outside the app
+    const unsubscribe = [
+      bridge?.onVoiceAssistantShortcut?.(() => pressOutside("composer.dictation")),
+      bridge?.onVoiceReplyShortcut?.(() => pressOutside("voice.reply")),
+      bridge?.onVoiceRecordingStop?.(finishFromPanel),
+    ];
+    return () => unsubscribe.forEach((off) => off?.());
+  }, [finishFromPanel, pressOutside]);
+  const panelOpen = floating && recordingActive;
+  const describePanel = useStableCallback(() =>
+    replyTo
+      ? describeReply(replyTo)
+      : { title: gt("New voice request"), project: gt("No project") },
+  );
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- shows the desktop's floating recording panel while a recording runs outside the app
   useEffect(() => {
-    if (!panelReply) return;
-    void window.desktopBridge?.showVoiceRecording?.(describePanel(panelReply));
+    if (!panelOpen) return;
+    void window.desktopBridge?.showVoiceRecording?.(describePanel());
     return () => void window.desktopBridge?.hideVoiceRecording?.();
-  }, [describePanel, panelReply]);
+  }, [describePanel, panelOpen]);
   const levelSentAt = useRef(0);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- streams the microphone level to the floating panel, at most ~15 times a second
   useEffect(() => {
-    if (!panelReply) return;
+    if (!panelOpen) return;
     const now = performance.now();
     if (!sending && now - levelSentAt.current < 66) return;
     levelSentAt.current = now;
     void window.desktopBridge?.updateVoiceRecording?.({ level: speech.level, sending });
-  }, [panelReply, sending, speech.level]);
+  }, [panelOpen, sending, speech.level]);
   const shortcutLabel = useDictationShortcut({
     keybindings,
     speech,
     assistant: true,
     commands: ["composer.dictation", "voice.reply"],
-    beforeStart,
+    beforeStart: (command) => {
+      setStartedOutside(false);
+      return beforeStart(command);
+    },
     disabled: opening,
     terminalOpen: false,
     modelPickerOpen: false,
   });
   return (
     <>
-      {(speech.state.phase !== "idle" || opening) && !floatingReply ? (
+      {(speech.state.phase !== "idle" || opening) && !floating ? (
         <div
           className="fixed right-4 bottom-4 z-50 flex w-[min(28rem,calc(100vw-2rem))] flex-col gap-2 rounded-xl border bg-background p-3 shadow-lg"
           role="region"
