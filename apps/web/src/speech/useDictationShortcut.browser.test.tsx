@@ -43,11 +43,11 @@ function Probe({
   return null;
 }
 
-const press = (repeat = false, letter = "D") =>
+const press = (repeat = false) =>
   window.dispatchEvent(
     new KeyboardEvent("keydown", {
-      key: letter,
-      code: `Key${letter}`,
+      key: "D",
+      code: "KeyD",
       ctrlKey: !/Mac/i.test(navigator.platform),
       metaKey: /Mac/i.test(navigator.platform),
       shiftKey: true,
@@ -172,7 +172,16 @@ it("records for the reply shortcut only when the target allows it", async () => 
   const speech = actions(true);
   const beforeStart = vi.fn((command: string) => command === "composer.dictation");
   await using _screen = await render(<Probe speech={speech} assistant beforeStart={beforeStart} />);
-  press(false, "U");
+  window.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      key: "R",
+      code: "KeyR",
+      ctrlKey: true,
+      altKey: true,
+      shiftKey: true,
+      cancelable: true,
+    }),
+  );
   expect(beforeStart).toHaveBeenLastCalledWith("voice.reply");
   expect(speech.start).not.toHaveBeenCalled();
   press();

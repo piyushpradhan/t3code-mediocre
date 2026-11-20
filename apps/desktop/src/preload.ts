@@ -120,6 +120,21 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   restartAudioService: () => ipcRenderer.invoke(IpcChannels.RESTART_AUDIO_SERVICE_CHANNEL),
   playVoiceReply: (audio) => ipcRenderer.invoke(IpcChannels.PLAY_VOICE_REPLY_CHANNEL, audio),
   stopVoiceReply: () => ipcRenderer.invoke(IpcChannels.STOP_VOICE_REPLY_CHANNEL),
+  showVoiceRecording: (description) =>
+    ipcRenderer.invoke(IpcChannels.SHOW_VOICE_RECORDING_CHANNEL, description),
+  updateVoiceRecording: (update) =>
+    ipcRenderer.invoke(IpcChannels.UPDATE_VOICE_RECORDING_CHANNEL, update),
+  hideVoiceRecording: () => ipcRenderer.invoke(IpcChannels.HIDE_VOICE_RECORDING_CHANNEL),
+  onVoiceReplyShortcut: (listener) => {
+    const handler = () => listener();
+    ipcRenderer.on(IpcChannels.VOICE_REPLY_SHORTCUT_CHANNEL, handler);
+    return () => ipcRenderer.removeListener(IpcChannels.VOICE_REPLY_SHORTCUT_CHANNEL, handler);
+  },
+  onVoiceRecordingStop: (listener) => {
+    const handler = () => listener();
+    ipcRenderer.on(IpcChannels.VOICE_RECORDING_STOP_CHANNEL, handler);
+    return () => ipcRenderer.removeListener(IpcChannels.VOICE_RECORDING_STOP_CHANNEL, handler);
+  },
   setNotificationBadge: (badge) =>
     ipcRenderer.invoke(IpcChannels.SET_NOTIFICATION_BADGE_CHANNEL, badge),
   onNotificationBadgeClear: (listener) => {

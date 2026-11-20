@@ -91,9 +91,11 @@ name in T3 Code. Unknown or duplicate names show an error with your transcript
 for copying or retrying. **Settings → Voice → Voice assistant shortcut** shows
 your current chord.
 
-To answer a reply the app just read aloud, press `mod+shift+u` within a minute
-of it. Recording starts the same way, and your answer is sent to the thread that
-spoke, opening it if needed. If that thread has an unsent draft, the answer is
+To answer a reply the app just read aloud, press `ctrl+alt+shift+r` within a
+minute of it, then press it again to finish. In the desktop app this works from
+any app, and a floating panel at the bottom right shows which thread and project
+you are replying to. Your answer is sent to the thread that spoke, opening it if
+needed. If that thread has an unsent draft, the answer is
 not sent and stays in the error notice for copying.
 
 Under **Settings → Voice → Persistent memory**, edit the instructions included

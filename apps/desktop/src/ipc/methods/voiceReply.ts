@@ -6,11 +6,53 @@ import * as Schema from "effect/Schema";
 
 import * as ElectronWindow from "../../electron/ElectronWindow.ts";
 import * as DesktopIpc from "../DesktopIpc.ts";
-import { PLAY_VOICE_REPLY_CHANNEL, STOP_VOICE_REPLY_CHANNEL } from "../channels.ts";
+import {
+  HIDE_VOICE_RECORDING_CHANNEL,
+  PLAY_VOICE_REPLY_CHANNEL,
+  SHOW_VOICE_RECORDING_CHANNEL,
+  STOP_VOICE_REPLY_CHANNEL,
+  UPDATE_VOICE_RECORDING_CHANNEL,
+  VOICE_RECORDING_STOP_CHANNEL,
+  VOICE_REPLY_SHORTCUT_CHANNEL,
+} from "../channels.ts";
 
 const WIDTH = 252;
 const HEIGHT = 52;
+const RECORDING_WIDTH = 300;
 const MARGIN = 16;
+// Rarely bound by other apps, so registering it system-wide steals nothing common.
+const REPLY_ACCELERATOR = "Control+Alt+Shift+R";
+
+const RECORDING_HTML = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'">
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:transparent;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;user-select:none}
+#pill{position:absolute;inset:0;display:flex;align-items:center;gap:10px;padding:0 8px 0 16px;border-radius:999px;background:#18181b;-webkit-app-region:drag}
+#dot{flex:none;width:8px;height:8px;border-radius:999px;background:#ef4444}
+#pill[data-sending] #dot{background:rgba(255,255,255,.4)}
+#copy{flex:1;min-width:0;line-height:15px}
+#title,#project{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#title{color:#fff;font-size:12px;font-weight:600}
+#project{color:rgba(255,255,255,.55);font-size:11px}
+canvas{flex:none;width:48px;height:24px}
+button{-webkit-app-region:no-drag;flex:none;display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:999px;background:rgba(255,255,255,.12);cursor:pointer}
+button:hover{background:rgba(255,255,255,.2)}
+button span{width:11px;height:11px;border-radius:2px;background:#fff}
+</style>
+<div id="pill"><span id="dot"></span><div id="copy"><div id="title"></div><div id="project"></div></div><canvas id="bars" aria-hidden="true"></canvas><button id="stop" title="Finish" aria-label="Finish"><span></span></button></div>
+<script>
+document.getElementById("stop").onclick=()=>window.close();
+const canvas=document.getElementById("bars"),g=canvas.getContext("2d"),ratio=devicePixelRatio,levels=new Array(8).fill(0);
+canvas.width=canvas.clientWidth*ratio;canvas.height=canvas.clientHeight*ratio;g.fillStyle="#fff";
+const bar=(canvas.width-3*ratio*7)/8;
+window.describe=(title,project)=>{document.getElementById("title").textContent=title;document.getElementById("project").textContent=project};
+window.update=(level,sending)=>{
+  document.getElementById("pill").toggleAttribute("data-sending",sending);
+  levels.shift();levels.push(sending?0:level);
+  g.clearRect(0,0,canvas.width,canvas.height);
+  levels.forEach((value,i)=>{const h=Math.max(bar,Math.min(1,value)*canvas.height);g.beginPath();g.roundRect(i*(bar+3*ratio),(canvas.height-h)/2,bar,h,bar/2);g.fill()});
+};
+window.update(0,false);
+</script>`;
 
 // The panel plays the audio itself, so its visualizer reads the real signal without streaming levels over IPC.
 const OVERLAY_HTML = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'">
@@ -71,21 +113,27 @@ class VoiceReplyError extends Schema.TaggedError<VoiceReplyError>()("VoiceReplyE
 }
 
 let overlay: Electron.BrowserWindow | undefined;
+let recording: Electron.BrowserWindow | undefined;
 
 function closeOverlay() {
   if (overlay && !overlay.isDestroyed()) overlay.destroy();
   overlay = undefined;
 }
 
-async function openOverlay(audio: Uint8Array, platform: NodeJS.Platform) {
-  closeOverlay();
+function closeRecording() {
+  const window = recording;
+  recording = undefined;
+  if (window && !window.isDestroyed()) window.destroy();
+}
+
+function createPanel(width: number, platform: NodeJS.Platform, title: string) {
   const area = Electron.screen.getDisplayNearestPoint(
     Electron.screen.getCursorScreenPoint(),
   ).workArea;
   const window = new Electron.BrowserWindow({
-    x: area.x + area.width - WIDTH - MARGIN,
+    x: area.x + area.width - width - MARGIN,
     y: area.y + area.height - HEIGHT - MARGIN,
-    width: WIDTH,
+    width,
     height: HEIGHT,
     alwaysOnTop: true,
     backgroundColor: "#00000000",
@@ -98,7 +146,7 @@ async function openOverlay(audio: Uint8Array, platform: NodeJS.Platform) {
     resizable: false,
     show: false,
     skipTaskbar: true,
-    title: "T3 Code Voice Reply",
+    title,
     transparent: true,
     ...(platform === "darwin" ? { type: "panel" as const } : {}),
     webPreferences: {
@@ -109,9 +157,41 @@ async function openOverlay(audio: Uint8Array, platform: NodeJS.Platform) {
       sandbox: true,
     },
   });
-  overlay = window;
   window.setAlwaysOnTop(true, "floating");
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  return window;
+}
+
+const sendToWindows = (channel: string) => {
+  for (const window of Electron.BrowserWindow.getAllWindows())
+    if (!window.isDestroyed()) window.webContents.send(channel);
+};
+
+async function openRecording(
+  { title, project }: typeof RecordingDescription.Type,
+  platform: NodeJS.Platform,
+) {
+  closeRecording();
+  const window = createPanel(RECORDING_WIDTH, platform, "T3 Code Voice Recording");
+  recording = window;
+  // Closed by its own Finish button rather than by the renderer, so tell the renderer to stop.
+  window.on("closed", () => {
+    if (recording !== window) return;
+    recording = undefined;
+    sendToWindows(VOICE_RECORDING_STOP_CHANNEL);
+  });
+  await window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(RECORDING_HTML)}`);
+  if (window.isDestroyed()) return;
+  await window.webContents.executeJavaScript(
+    `describe(${JSON.stringify(title)},${JSON.stringify(project)})`,
+  );
+  if (!window.isDestroyed()) window.showInactive();
+}
+
+async function openOverlay(audio: Uint8Array, platform: NodeJS.Platform) {
+  closeOverlay();
+  const window = createPanel(WIDTH, platform, "T3 Code Voice Reply");
+  overlay = window;
   window.on("closed", () => {
     if (overlay === window) overlay = undefined;
   });
@@ -145,6 +225,63 @@ export const playVoiceReply = DesktopIpc.makeIpcMethod({
     }).pipe(Effect.tapError(() => Effect.sync(closeOverlay)));
   }),
 });
+
+const RecordingDescription = Schema.Struct({
+  title: Schema.String.check(Schema.isMaxLength(500)),
+  project: Schema.String.check(Schema.isMaxLength(500)),
+});
+
+export const showVoiceRecording = DesktopIpc.makeIpcMethod({
+  channel: SHOW_VOICE_RECORDING_CHANNEL,
+  payload: RecordingDescription,
+  result: Schema.Void,
+  handler: Effect.fn("desktop.ipc.voiceReply.showRecording")(function* (description, event) {
+    if (!(yield* fromMainWindow(event))) return;
+    const platform = yield* HostProcess.Platform;
+    yield* Effect.tryPromise({
+      try: () => openRecording(description, platform),
+      catch: (cause) => new VoiceReplyError({ cause }),
+    }).pipe(Effect.tapError(() => Effect.sync(closeRecording)));
+  }),
+});
+
+export const updateVoiceRecording = DesktopIpc.makeIpcMethod({
+  channel: UPDATE_VOICE_RECORDING_CHANNEL,
+  payload: Schema.Struct({ level: Schema.Finite, sending: Schema.Boolean }),
+  result: Schema.Void,
+  handler: Effect.fn("desktop.ipc.voiceReply.updateRecording")(function* (update, event) {
+    if (!(yield* fromMainWindow(event)) || !recording || recording.isDestroyed()) return;
+    recording.webContents
+      .executeJavaScript(`update(${update.level},${update.sending})`)
+      .catch(() => undefined);
+  }),
+});
+
+export const hideVoiceRecording = DesktopIpc.makeIpcMethod({
+  channel: HIDE_VOICE_RECORDING_CHANNEL,
+  payload: Schema.Void,
+  result: Schema.Void,
+  handler: Effect.fn("desktop.ipc.voiceReply.hideRecording")(function* (_payload, event) {
+    if (yield* fromMainWindow(event)) closeRecording();
+  }),
+});
+
+/** A system-wide chord that forwards to the app, so a spoken reply can be answered from any app. */
+export const installVoiceReplyShortcut = Effect.fn("desktop.ipc.installVoiceReplyShortcut")(
+  function* () {
+    yield* Effect.sync(() =>
+      Electron.globalShortcut.register(REPLY_ACCELERATOR, () =>
+        sendToWindows(VOICE_REPLY_SHORTCUT_CHANNEL),
+      ),
+    );
+    yield* Effect.addFinalizer(() =>
+      Effect.sync(() => {
+        Electron.globalShortcut.unregister(REPLY_ACCELERATOR);
+        closeRecording();
+      }),
+    );
+  },
+);
 
 export const stopVoiceReply = DesktopIpc.makeIpcMethod({
   channel: STOP_VOICE_REPLY_CHANNEL,

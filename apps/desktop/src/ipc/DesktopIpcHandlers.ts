@@ -4,7 +4,14 @@ import * as Effect from "effect/Effect";
 import { receiveProviderAuthCallback, cancelProviderAuthCallback } from "./methods/providerAuth.ts";
 import * as DesktopIpc from "./DesktopIpc.ts";
 import { installNotificationBadge } from "./methods/notificationBadge.ts";
-import { playVoiceReply, stopVoiceReply } from "./methods/voiceReply.ts";
+import {
+  hideVoiceRecording,
+  installVoiceReplyShortcut,
+  playVoiceReply,
+  showVoiceRecording,
+  stopVoiceReply,
+  updateVoiceRecording,
+} from "./methods/voiceReply.ts";
 import { getClientSettings, setClientSettings } from "./methods/clientSettings.ts";
 import { getConnectionCatalog, setConnectionCatalog } from "./methods/connectionCatalog.ts";
 import {
@@ -116,6 +123,10 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handle(restartAudioService);
   yield* ipc.handle(playVoiceReply);
   yield* ipc.handle(stopVoiceReply);
+  yield* ipc.handle(showVoiceRecording);
+  yield* ipc.handle(updateVoiceRecording);
+  yield* ipc.handle(hideVoiceRecording);
+  yield* installVoiceReplyShortcut();
   yield* ipc.handle(getClientSettings);
   yield* ipc.handle(setClientSettings);
   yield* ipc.handle(getConnectionCatalog);

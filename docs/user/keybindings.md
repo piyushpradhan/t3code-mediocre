@@ -9,8 +9,8 @@ actions menu. **Reset to default** brings it back.
 ## Composer controls
 
 `mod+shift+d` starts the voice assistant and finishes recording on the next press;
-`mod+shift+u` (**Voice: Reply to Last Spoken Reply**) records an answer to a
-reply read aloud in the last minute;
+`ctrl+alt+shift+r` (**Voice: Reply to Last Spoken Reply**) records an answer to a
+reply read aloud in the last minute, from any app on desktop;
 `Esc` discards the recording. Change the chord under **Composer: Start or Finish
 Dictation**, and the hold or toggle behavior in **Settings → Voice**. See
 [Voice input](./voice-input.md).

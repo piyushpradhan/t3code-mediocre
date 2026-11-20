@@ -1095,6 +1095,14 @@ export interface DesktopBridge {
   /** Plays a spoken reply in a floating panel with a visualizer and a stop button. */
   playVoiceReply?: (audio: Uint8Array) => Promise<void>;
   stopVoiceReply?: () => Promise<void>;
+  /** A floating recording panel naming where the recording will be sent. */
+  showVoiceRecording?: (description: { title: string; project: string }) => Promise<void>;
+  updateVoiceRecording?: (update: { level: number; sending: boolean }) => Promise<void>;
+  hideVoiceRecording?: () => Promise<void>;
+  /** The system-wide reply chord was pressed, even while another app had focus. */
+  onVoiceReplyShortcut?: (listener: () => void) => () => void;
+  /** Finish was pressed on the floating recording panel. */
+  onVoiceRecordingStop?: (listener: () => void) => () => void;
   setNotificationBadge: (badge: { count: number; image: string | null }) => Promise<void>;
   onNotificationBadgeClear: (listener: () => void) => () => void;
   onTrackpadScrollBegin: (listener: () => void) => () => void;

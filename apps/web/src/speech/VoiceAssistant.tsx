@@ -1,13 +1,14 @@
 import { useAtomValue } from "@effect/atom-react";
+import { isScratchProject } from "@t3tools/client-runtime/state/projects";
 import {
   scopedThreadKey,
   scopeProjectRef,
   scopeThreadRef,
 } from "@t3tools/client-runtime/environment";
-import type { EnvironmentId } from "@t3tools/contracts";
+import type { EnvironmentId, KeybindingCommand } from "@t3tools/contracts";
 import { useRouter } from "@tanstack/react-router";
 import { msg, useGT } from "gt-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ComposerSpeechRecordingPill } from "~/components/chat/ComposerSpeechButton";
 import { VoiceInputSetup } from "~/components/chat/VoiceInputSetup";
@@ -18,7 +19,7 @@ import { useScratchProject } from "~/hooks/useScratchProject";
 import { getClientSettings, useClientSettings } from "~/hooks/useSettings";
 import { m } from "~/i18n/messages";
 import { useStableCallback } from "~/hooks/useStableCallback";
-import { readProjects } from "~/state/entities";
+import { readProjects, readThreadShell } from "~/state/entities";
 import { usePrimaryEnvironmentId } from "~/state/environments";
 import { primaryServerKeybindingsAtom } from "~/state/server";
 import { buildThreadRouteParams } from "~/threadRoutes";
@@ -42,7 +43,7 @@ export function VoiceAssistant() {
 function VoiceAssistantSession({ environmentId }: { environmentId: EnvironmentId }) {
   const router = useRouter();
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
-  const { openScratchProject } = useScratchProject();
+  const { openScratchProject, scratchWorkspaceRootFor } = useScratchProject();
   const handleNewThread = useNewThreadHandler();
   const gt = useGT();
   const [opening, setOpening] = useState(false);
@@ -111,44 +112,104 @@ function VoiceAssistantSession({ environmentId }: { environmentId: EnvironmentId
     readDraft: () => ({ text: "", selection: { start: 0, end: 0 } }),
     commitDraft: (text) => void openTranscript(text),
   });
+  const beforeStart = (command: KeybindingCommand) => {
+    if (command !== "voice.reply") {
+      setReplyTo(undefined);
+      return true;
+    }
+    const recent = recentSpokenReply();
+    if (!recent)
+      toastManager.add({
+        type: "info",
+        title: m(msg("No spoken reply in the last minute to answer.")),
+      });
+    setReplyTo(recent);
+    return recent !== undefined;
+  };
+  const describeReply = (reply: SpokenReply) => {
+    const shell = readThreadShell(scopeThreadRef(reply.environmentId, reply.threadId));
+    const project = readProjects().find(
+      (entry) => entry.environmentId === reply.environmentId && entry.id === shell?.projectId,
+    );
+    return {
+      title: gt("Replying to {thread}", { thread: shell?.title ?? gt("this thread") }),
+      project:
+        !project || isScratchProject(project, scratchWorkspaceRootFor(reply.environmentId))
+          ? gt("No project")
+          : project.title,
+    };
+  };
+  const recordingActive =
+    opening || (speech.state.phase !== "idle" && speech.state.phase !== "error");
+  const sending = opening || speech.state.phase === "transcribing";
+  const floatingReply =
+    replyTo !== undefined && window.desktopBridge?.showVoiceRecording !== undefined;
+  const pressReply = useStableCallback(() => {
+    if (speech.state.phase === "recording") return void speech.stop();
+    if (recordingActive || !speech.available) return;
+    if (beforeStart("voice.reply")) void speech.start();
+  });
+  const finishFromPanel = useStableCallback(() => {
+    if (speech.state.phase === "recording") void speech.stop();
+    else if (speech.state.phase === "preparing") speech.cancel();
+  });
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to the desktop's system-wide reply chord and the floating panel's Finish button
+  useEffect(() => {
+    const bridge = window.desktopBridge;
+    const offShortcut = bridge?.onVoiceReplyShortcut?.(pressReply);
+    const offFinish = bridge?.onVoiceRecordingStop?.(finishFromPanel);
+    return () => {
+      offShortcut?.();
+      offFinish?.();
+    };
+  }, [finishFromPanel, pressReply]);
+  const panelReply = floatingReply && recordingActive ? replyTo : undefined;
+  const describePanel = useStableCallback(describeReply);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- shows the desktop's floating recording panel while a reply records outside the app
+  useEffect(() => {
+    if (!panelReply) return;
+    void window.desktopBridge?.showVoiceRecording?.(describePanel(panelReply));
+    return () => void window.desktopBridge?.hideVoiceRecording?.();
+  }, [describePanel, panelReply]);
+  const levelSentAt = useRef(0);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- streams the microphone level to the floating panel, at most ~15 times a second
+  useEffect(() => {
+    if (!panelReply) return;
+    const now = performance.now();
+    if (!sending && now - levelSentAt.current < 66) return;
+    levelSentAt.current = now;
+    void window.desktopBridge?.updateVoiceRecording?.({ level: speech.level, sending });
+  }, [panelReply, sending, speech.level]);
   const shortcutLabel = useDictationShortcut({
     keybindings,
     speech,
     assistant: true,
     commands: ["composer.dictation", "voice.reply"],
-    beforeStart: (command) => {
-      if (command !== "voice.reply") {
-        setReplyTo(undefined);
-        return true;
-      }
-      const recent = recentSpokenReply();
-      if (!recent)
-        toastManager.add({
-          type: "info",
-          title: m(msg("No spoken reply in the last minute to answer.")),
-        });
-      setReplyTo(recent);
-      return recent !== undefined;
-    },
+    beforeStart,
     disabled: opening,
     terminalOpen: false,
     modelPickerOpen: false,
   });
   return (
     <>
-      {speech.state.phase !== "idle" || opening ? (
+      {(speech.state.phase !== "idle" || opening) && !floatingReply ? (
         <div
           className="fixed right-4 bottom-4 z-50 flex w-[min(28rem,calc(100vw-2rem))] flex-col gap-2 rounded-xl border bg-background p-3 shadow-lg"
           role="region"
           aria-label={gt("Voice assistant")}
         >
-          <span className="text-sm font-medium">
-            {opening
-              ? gt("Sending…")
-              : replyTo
-                ? gt("Replying to the last spoken reply")
-                : gt("Voice assistant · No project")}
-          </span>
+          {replyTo ? (
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{describeReply(replyTo).title}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {describeReply(replyTo).project}
+              </p>
+            </div>
+          ) : (
+            <span className="text-sm font-medium">
+              {opening ? gt("Sending…") : gt("Voice assistant · No project")}
+            </span>
+          )}
           {speech.preview ? (
             <p className="text-sm" role="status">
               {speech.preview.committed}
