@@ -139,6 +139,7 @@ function makeFakeBrowserWindow() {
     window: window as unknown as Electron.BrowserWindow,
     getBounds: window.getBounds,
     getNormalBounds: window.getNormalBounds,
+    hide: window.hide,
     isDestroyed: window.isDestroyed,
     isFullScreen: window.isFullScreen,
     isMaximized: window.isMaximized,
@@ -1423,7 +1424,7 @@ describe("DesktopWindow", () => {
         close(closeEvent);
         // macOS keeps the window, so the menu bar's voice chords still have a renderer.
         assert.strictEqual(closeEvent.preventDefault.mock.calls.length, 1);
-        assert.strictEqual(fakeWindow.window.hide.mock.calls.length, 1);
+        assert.strictEqual(fakeWindow.hide.mock.calls.length, 1);
         yield* Deferred.await(writeStarted);
         fakeWindow.isDestroyed.mockReturnValue(true);
 
