@@ -1,5 +1,5 @@
 import type { VoiceInputState } from "@t3tools/client-runtime/voice-input";
-import type { ResolvedKeybindingsConfig } from "@t3tools/contracts";
+import type { KeybindingCommand, ResolvedKeybindingsConfig } from "@t3tools/contracts";
 import { useEffect, useRef, type RefObject } from "react";
 
 import { isCommandPaletteOpen } from "../commandPaletteBus";
@@ -8,6 +8,7 @@ import { resolveShortcutCommand, shortcutLabelForCommand } from "../keybindings"
 import { getTerminalFocusOwner } from "../lib/terminalFocus";
 
 const HOLD_THRESHOLD_MS = 300;
+const DICTATION_COMMANDS: readonly KeybindingCommand[] = ["composer.dictation"];
 
 function shouldFinishDictationOnRelease(mode: "auto" | "hold" | "toggle", elapsedMs: number) {
   return mode === "hold" || (mode === "auto" && elapsedMs >= HOLD_THRESHOLD_MS);
@@ -36,6 +37,10 @@ type ShortcutInput = {
   /** Resolve the chord as if the preview had focus; the keys arrive relayed from its guest. */
   previewFocus?: boolean;
   assistant?: boolean;
+  /** Commands that start or finish this recording; the first labels it. */
+  commands?: readonly KeybindingCommand[];
+  /** Called before a recording starts; returning false leaves the press unanswered. */
+  beforeStart?: (command: KeybindingCommand) => boolean;
   /** When set, the chord targets this editor only while it has focus. */
   targetRef?: RefObject<HTMLElement | null>;
   /** An editor outside this document reports whether it holds the keyboard. */
@@ -158,7 +163,7 @@ export function useDictationShortcut(input: ShortcutInput) {
           ...(previewFocus ? { editableFocus: true } : {}),
         },
       });
-      if (command !== "composer.dictation") return;
+      if (!command || !(current.current.commands ?? DICTATION_COMMANDS).includes(command)) return;
       const canStart = speech.state.phase === "idle" || speech.state.phase === "error";
       if (canStart && (!speech.available || disabled)) return;
       event.preventDefault();
@@ -171,6 +176,7 @@ export function useDictationShortcut(input: ShortcutInput) {
         void speech.stop();
         return;
       }
+      if (current.current.beforeStart?.(command) === false) return;
       pressed.current = {
         generation: generation.current,
         code: event.code || event.key,

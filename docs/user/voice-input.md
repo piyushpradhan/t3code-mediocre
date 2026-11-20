@@ -91,6 +91,11 @@ name in T3 Code. Unknown or duplicate names show an error with your transcript
 for copying or retrying. **Settings → Voice → Voice assistant shortcut** shows
 your current chord.
 
+To answer a reply the app just read aloud, press `mod+shift+u` within a minute
+of it. Recording starts the same way, and your answer is sent to the thread that
+spoke, opening it if needed. If that thread has an unsent draft, the answer is
+not sent and stays in the error notice for copying.
+
 Under **Settings → Voice → Persistent memory**, edit the instructions included
 with every voice assistant request. They ask the agent to read your Notion memory
 by default. The selected agent must have access to that memory source; this setting

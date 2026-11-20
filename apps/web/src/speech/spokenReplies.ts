@@ -1,6 +1,7 @@
 import { synthesizeEnvironmentSpeech } from "@t3tools/client-runtime/voice-input";
 import {
   type EnvironmentId,
+  type ThreadId,
   type EnvironmentSpeechSynthesisRequest,
   SpeechSynthesisError,
 } from "@t3tools/contracts";
@@ -15,6 +16,13 @@ import { runEnvironmentSpeech } from "./runEnvironmentSpeech";
 
 const isSynthesisError = Schema.is(SpeechSynthesisError);
 let playing: AudioBufferSourceNode | undefined;
+let lastReply: { environmentId: EnvironmentId; threadId: ThreadId; at: number } | undefined;
+const REPLY_WINDOW_MS = 60_000;
+
+/** The thread whose reply was read aloud within the last minute, which the reply shortcut answers. */
+export function recentSpokenReply() {
+  return lastReply && Date.now() - lastReply.at <= REPLY_WINDOW_MS ? lastReply : undefined;
+}
 // Bumped by every stop, so audio that arrives for a superseded request is dropped.
 let generation = 0;
 
@@ -43,6 +51,8 @@ export async function speak(
   if (!prepared) throw new Error("The environment isn’t connected.");
   const audio = await runEnvironmentSpeech(synthesizeEnvironmentSpeech(prepared, request));
   if (mine !== generation) return;
+  if ("threadId" in request)
+    lastReply = { environmentId, threadId: request.threadId, at: Date.now() };
   if (floating) return floating(audio);
   if (!context) return;
   const buffer = await context.decodeAudioData(audio.slice().buffer);

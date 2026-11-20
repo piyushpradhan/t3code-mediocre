@@ -2,7 +2,6 @@ import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import { msg } from "gt-react";
 import { useSyncExternalStore } from "react";
 
-import type { DraftId } from "../composerDraftStore";
 import { m } from "../i18n/messages";
 
 type VoiceProject = Pick<EnvironmentProject, "id" | "environmentId" | "title" | "archivedAt">;
@@ -37,17 +36,17 @@ export function resolveVoiceAssistantProject(text: string, projects: readonly Vo
   return { kind: "project", project } as const;
 }
 
-// Drafts the voice assistant opened, which ChatView sends once its composer can.
-const autoSendDraftIds = new Set<DraftId>();
+// Draft ids or scoped thread keys whose composer ChatView sends once it can.
+const autoSendDraftIds = new Set<string>();
 const autoSendListeners = new Set<() => void>();
 const emitAutoSend = () => autoSendListeners.forEach((listener) => listener());
 
-export function requestVoiceAutoSend(draftId: DraftId) {
+export function requestVoiceAutoSend(draftId: string) {
   autoSendDraftIds.add(draftId);
   emitAutoSend();
 }
 
-export function takeVoiceAutoSend(draftId: DraftId) {
+export function takeVoiceAutoSend(draftId: string) {
   if (!autoSendDraftIds.delete(draftId)) return false;
   emitAutoSend();
   return true;
@@ -58,6 +57,6 @@ const subscribeAutoSend = (listener: () => void) => {
   return () => autoSendListeners.delete(listener);
 };
 
-export function useVoiceAutoSend(draftId: DraftId | null | undefined) {
-  return useSyncExternalStore(subscribeAutoSend, () => !!draftId && autoSendDraftIds.has(draftId));
+export function useVoiceAutoSend(draftId: string) {
+  return useSyncExternalStore(subscribeAutoSend, () => autoSendDraftIds.has(draftId));
 }

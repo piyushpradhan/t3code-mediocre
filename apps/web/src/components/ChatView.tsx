@@ -3185,9 +3185,10 @@ export default function ChatView(props: ChatViewProps) {
     setDraftThreadContext,
     workLocallyResendReady,
   ]);
+  const voiceAutoSendKey = draftId ?? routeThreadKey;
   const voiceAutoSendReady =
-    useVoiceAutoSend(draftId) &&
-    isLocalDraftThread &&
+    useVoiceAutoSend(voiceAutoSendKey) &&
+    (isLocalDraftThread || isServerThread) &&
     !isSendBusy &&
     !threadDetailLoading &&
     clientSettingsHydrated &&
@@ -3196,9 +3197,9 @@ export default function ChatView(props: ChatViewProps) {
     !activePendingUserInput;
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- sends a voice assistant draft once, as soon as its composer can send
   useEffect(() => {
-    if (!voiceAutoSendReady || !draftId || sendInFlightRef.current) return;
-    if (takeVoiceAutoSend(draftId)) void onComposerSendStable();
-  }, [draftId, onComposerSendStable, sendInFlightRef, voiceAutoSendReady]);
+    if (!voiceAutoSendReady || sendInFlightRef.current) return;
+    if (takeVoiceAutoSend(voiceAutoSendKey)) void onComposerSendStable();
+  }, [onComposerSendStable, sendInFlightRef, voiceAutoSendKey, voiceAutoSendReady]);
 
   const shownThreadSyncPhase = activeEnvironmentUnavailable ? null : delayedThreadSyncPhase;
   const hasThreadNow =

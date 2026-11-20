@@ -21,11 +21,13 @@ function Probe({
   targetRef,
   subscribeKeys,
   assistant,
+  beforeStart,
 }: {
   speech: ShortcutInput["speech"];
   targetRef?: RefObject<HTMLElement | null>;
   subscribeKeys?: ShortcutInput["subscribeKeys"];
   assistant?: boolean;
+  beforeStart?: ShortcutInput["beforeStart"];
 }) {
   useDictationShortcut({
     keybindings: DEFAULT_RESOLVED_KEYBINDINGS,
@@ -36,15 +38,16 @@ function Probe({
     ...(targetRef ? { targetRef } : {}),
     ...(subscribeKeys ? { subscribeKeys, ownsFocus: () => true } : {}),
     ...(assistant ? { assistant } : {}),
+    ...(beforeStart ? { commands: ["composer.dictation", "voice.reply"], beforeStart } : {}),
   });
   return null;
 }
 
-const press = (repeat = false) =>
+const press = (repeat = false, letter = "D") =>
   window.dispatchEvent(
     new KeyboardEvent("keydown", {
-      key: "D",
-      code: "KeyD",
+      key: letter,
+      code: `Key${letter}`,
       ctrlKey: !/Mac/i.test(navigator.platform),
       metaKey: /Mac/i.test(navigator.platform),
       shiftKey: true,
@@ -163,6 +166,18 @@ it("starts the assistant ahead of a focused editor, but lets an existing recordi
   );
   press();
   expect(editor.stop).toHaveBeenCalledOnce();
+});
+
+it("records for the reply shortcut only when the target allows it", async () => {
+  const speech = actions(true);
+  const beforeStart = vi.fn((command: string) => command === "composer.dictation");
+  await using _screen = await render(<Probe speech={speech} assistant beforeStart={beforeStart} />);
+  press(false, "U");
+  expect(beforeStart).toHaveBeenLastCalledWith("voice.reply");
+  expect(speech.start).not.toHaveBeenCalled();
+  press();
+  expect(beforeStart).toHaveBeenLastCalledWith("composer.dictation");
+  expect(speech.start).toHaveBeenCalledOnce();
 });
 
 it("lets Escape in another dictation editor reach that editor instead of canceling the recording", async () => {
