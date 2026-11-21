@@ -3,7 +3,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 
 export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
-  // Earlier fork builds shipped this as migration 86, 92, 96, 97, 99, 100, 101 or 102, so those databases already have the column.
+  // Earlier fork builds shipped this as migration 86, 92, 96, 97, 99, 100, 101, 102 or 103, so those databases already have the column.
   const columns = yield* sql<{ readonly name: string }>`
     PRAGMA table_info(projection_projects)
   `;

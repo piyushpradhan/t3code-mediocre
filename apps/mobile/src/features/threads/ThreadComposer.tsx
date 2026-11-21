@@ -404,6 +404,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
       props.serverConfig?.providers ?? [],
       props.serverConfig?.usageLimitSources ?? [],
       Date.now(),
+      currentModelSelection.model,
     );
     onShowUsageLimits(report);
     if (!report) {
@@ -413,7 +414,13 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
       );
     }
     return report !== null;
-  }, [currentModelSelection.instanceId, props.serverConfig, onShowUsageLimits, gt]);
+  }, [
+    currentModelSelection.instanceId,
+    currentModelSelection.model,
+    props.serverConfig,
+    onShowUsageLimits,
+    gt,
+  ]);
 
   const mentionableEnvironments = useMentionableEnvironments();
   // Mentions name any model for the agent, so they aren't limited to models this thread can switch to.

@@ -110,7 +110,8 @@ import Migration0099 from "./Migrations/099_BackgroundRecoveryIndexes.ts";
 import Migration0100 from "./Migrations/100_TurnStartReadIndexes.ts";
 import Migration0101 from "./Migrations/101_DelegatedTaskReadIndexes.ts";
 import Migration0102 from "./Migrations/102_ThreadItemCounts.ts";
-import Migration0103 from "./Migrations/103_ProjectionProjectsProductMembers.ts";
+import Migration0103 from "./Migrations/103_IssueTrackerAdditionalScopes.ts";
+import Migration0104 from "./Migrations/104_ProjectionProjectsProductMembers.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -216,7 +217,8 @@ const migrationEntries = [
   [100, "TurnStartReadIndexes", Migration0100],
   [101, "DelegatedTaskReadIndexes", Migration0101],
   [102, "ThreadItemCounts", Migration0102],
-  [103, "ProjectionProjectsProductMembers", Migration0103],
+  [103, "IssueTrackerAdditionalScopes", Migration0103],
+  [104, "ProjectionProjectsProductMembers", Migration0104],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
@@ -307,7 +309,7 @@ const releaseForkMigrationIds = Effect.fn("releaseForkMigrationIds")(function* (
       SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'effect_sql_migrations'
     `;
   if (tables.length === 0) return;
-  const staleWhere = sql`(migration_id = 55 AND name = 'ProjectionThreadNote') OR (migration_id IN (86, 92, 96, 97, 99, 100, 101, 102) AND name = 'ProjectionProjectsProductMembers')`;
+  const staleWhere = sql`(migration_id = 55 AND name = 'ProjectionThreadNote') OR (migration_id IN (86, 92, 96, 97, 99, 100, 101, 102, 103) AND name = 'ProjectionProjectsProductMembers')`;
   // CLI startup may run read-only, so only write when a stale fork row exists.
   const stale = yield* sql`SELECT 1 FROM effect_sql_migrations WHERE ${staleWhere} LIMIT 1`;
   if (stale.length === 0) return;
