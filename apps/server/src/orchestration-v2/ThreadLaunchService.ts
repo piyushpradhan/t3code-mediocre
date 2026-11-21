@@ -108,6 +108,8 @@ export interface ThreadLaunchInput {
   readonly projectId: ProjectId;
   readonly title: string;
   readonly generateTitle?: boolean;
+  /** The caller chose `title`, so a first message keeps it. */
+  readonly titleRenamed?: boolean;
   readonly modelSelection: ModelSelection;
   readonly runtimeMode: RuntimeMode;
   readonly interactionMode: ProviderInteractionMode;
@@ -1527,6 +1529,7 @@ const make = Effect.gen(function* () {
                 threadId: candidateThreadId,
                 projectId: input.projectId,
                 title: input.title,
+                ...(input.titleRenamed === true ? { titleRenamed: true } : {}),
                 modelSelection: input.modelSelection,
                 runtimeMode: input.runtimeMode,
                 interactionMode: input.interactionMode,
