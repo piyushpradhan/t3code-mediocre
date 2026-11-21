@@ -1,13 +1,18 @@
 import {
   type EnvironmentSpeechSynthesisRequest,
+  DEFAULT_TEXT_GENERATION_MODEL_BY_PROVIDER,
+  isProviderAvailable,
+  isProviderTextGenerationCapable,
   isSecretReference,
   type ServerSettingsError,
   SpeechSynthesisError,
 } from "@t3tools/contracts";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
-import { resolveSpeechPostProcessingModelSelection } from "@t3tools/shared/serverSettings";
+import { fallbackTextGenerationModelSelection } from "@t3tools/shared/serverSettings";
 import { speakableText } from "@t3tools/shared/speech";
+import { exhaustedUsageWindow } from "@t3tools/shared/usageLimits";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -18,20 +23,12 @@ import * as ThreadManagementService from "../orchestration-v2/ThreadManagementSe
 import { requireSettingsSecret } from "../secrets/settingsSecretValue.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as TextGeneration from "../textGeneration/TextGeneration.ts";
+import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
+import { spokenReplyPrompt, spokenReplyText } from "./spokenReply.ts";
 
 type Reason = SpeechSynthesisError["reason"];
 const fail = (reason: Reason) => new SpeechSynthesisError({ reason });
 const RUN_BRIEF_MAX_CHARS = 240;
-
-const replyGistPrompt = (
-  reply: string,
-) => `Turn this coding agent's reply into what it would say out loud to the person who asked: one or two short, conversational sentences that capture the gist of the whole reply, including the outcome and anything the person needs to do. No markdown, code, file paths, commands, or technical detail unless it is the point. Speak in first person as the agent.
-
-<reply>
-${reply}
-</reply>
-
-Return only the spoken sentences.`;
 
 export class SpeechSynthesis extends Context.Service<
   SpeechSynthesis,
@@ -55,27 +52,48 @@ export const layer = Layer.effect(
     const http = yield* HttpClient.HttpClient;
     const textGeneration = yield* TextGeneration.TextGeneration;
     const fileSystem = yield* FileSystem.FileSystem;
+    const providers = yield* ProviderRegistry.ProviderRegistry;
 
-    // ponytail: reuses the dictation cleanup op as a generic prompt-to-text call, falling back to the opening sentences.
-    const replyGist = (reply: string) => {
+    const replyGist = Effect.fn("SpeechSynthesis.replyGist")(function* (
+      reply: string,
+      request: string,
+    ) {
       const prose = speakableText(reply, Number.MAX_SAFE_INTEGER);
-      if (prose.length <= RUN_BRIEF_MAX_CHARS) return Effect.succeed(prose);
+      if (prose.length <= RUN_BRIEF_MAX_CHARS) return spokenReplyText(prose);
       const opening = speakableText(reply, RUN_BRIEF_MAX_CHARS);
-      return Effect.gen(function* () {
-        const current = yield* settings.getSettings;
-        // Providers run in a working directory; a summary must not read a checkout.
-        const cwd = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-spoken-reply-" });
-        const generated = yield* textGeneration.generateTranscriptionPostProcessing({
-          cwd,
-          prompt: replyGistPrompt(reply),
-          modelSelection: resolveSpeechPostProcessingModelSelection(current),
-        });
-        return speakableText(generated.transcription) || opening;
-      }).pipe(
-        Effect.scoped,
-        Effect.orElseSucceed(() => opening),
+      const current = yield* settings.getSettings;
+      const snapshots = yield* providers.getProviders;
+      const now = DateTime.toEpochMillis(yield* DateTime.now);
+      const modelSelection = fallbackTextGenerationModelSelection(
+        current.providerInstances,
+        (instanceId, driver, model) =>
+          snapshots.some(
+            (provider) =>
+              provider.instanceId === instanceId &&
+              provider.enabled &&
+              provider.installed &&
+              provider.status !== "error" &&
+              provider.auth.status !== "unauthenticated" &&
+              isProviderAvailable(provider) &&
+              isProviderTextGenerationCapable(provider) &&
+              !exhaustedUsageWindow(provider, now, model) &&
+              DEFAULT_TEXT_GENERATION_MODEL_BY_PROVIDER[driver] === model &&
+              provider.models.some(
+                (candidate) =>
+                  candidate.slug === model && candidate.supportsTextGeneration !== false,
+              ),
+          ),
       );
-    };
+      if (!modelSelection) return spokenReplyText(opening);
+      // Providers run in a working directory; a summary must not read a checkout.
+      const cwd = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-spoken-reply-" });
+      const generated = yield* textGeneration.generateTranscriptionPostProcessing({
+        cwd,
+        prompt: spokenReplyPrompt(reply, request),
+        modelSelection,
+      });
+      return spokenReplyText(generated.transcription) || spokenReplyText(opening);
+    }, Effect.scoped);
 
     const speak = Effect.fn("SpeechSynthesis.speak")(
       function* (request: typeof EnvironmentSpeechSynthesisRequest.Type) {
@@ -84,16 +102,25 @@ export const layer = Layer.effect(
         if (!baseUrl) return yield* fail("not-configured");
         if (!/^https?:\/\//i.test(baseUrl) || !URL.canParse(baseUrl))
           return yield* fail("unavailable");
-        const input =
-          "text" in request
-            ? speakableText(request.text)
-            : yield* replyGist(
-                (yield* threads.getThreadRecords(request.threadId, ["messages"], {
-                  messageRoles: ["assistant"],
-                  messageRunIds: [request.runId],
-                })).messages.findLast((message) => !message.workflowScript && message.text.trim())
-                  ?.text ?? "",
-              );
+        let input: string;
+        if ("text" in request) input = spokenReplyText(request.text);
+        else {
+          const { messages } = yield* threads.getThreadRecords(request.threadId, ["messages"], {
+            messageRoles: ["assistant", "user"],
+            messageRunIds: [request.runId],
+          });
+          const reply =
+            messages.findLast(
+              (message) =>
+                message.role === "assistant" && !message.workflowScript && message.text.trim(),
+            )?.text ?? "";
+          input = yield* replyGist(
+            reply,
+            messages.findLast((message) => message.role === "user")?.text ?? "",
+          ).pipe(
+            Effect.orElseSucceed(() => spokenReplyText(speakableText(reply, RUN_BRIEF_MAX_CHARS))),
+          );
+        }
         if (!input) return yield* fail("nothing-to-say");
         const source = cloudSpeechCredentials.synthesis;
         // A vault that locked since the last reply must not authorize sending this one.

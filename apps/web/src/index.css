@@ -411,6 +411,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     background-position: center;
     background-size: cover;
     background-repeat: no-repeat;
+    background-attachment: fixed;
   }
 }
 

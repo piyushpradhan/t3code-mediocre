@@ -190,8 +190,9 @@ the model hears the cue as a dictionary hint.
 To talk with an agent hands-free, dictate your message and have the reply read
 back. In **Settings → Voice → Spoken replies**, turn on **Read replies aloud**.
 When the thread you have open finishes a run, this device plays the reply. A
-long reply is spoken as a sentence or two that sums it up, written by your voice
-cleanup model; code blocks, tables, and link addresses are skipped. In the desktop
+long reply is summarized using an available provider's low-cost model, independently of
+your voice cleanup model. Spoken summaries stay within 100 words unless you explicitly ask
+for a verbose or detailed response; code blocks, tables, and link addresses are skipped. In the desktop
 app, the reply plays in a floating panel at the bottom right of your screen, above
 other apps, with a live audio visualizer; in a browser, a notice shows instead.
 Starting a new dictation, or **Stop** on the panel or notice, ends playback. The switch is saved on this device only.
