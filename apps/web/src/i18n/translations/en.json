@@ -12454,5 +12454,9 @@
   "27d76249d09eb69f": "Review guide ready",
   "faa3bb26abb39c93": "Review guide failed",
   "b7df38b7d8792d78": "Open guide",
-  "9e91e9a77b664e4e": "Could not start a review guide"
+  "9e91e9a77b664e4e": "Could not start a review guide",
+  "e18e2ce4a86a94c3": "Voice avatar",
+  "015968b3a1324d65": "Drop a PNG, JPEG, or WebP under 5 MB. A transparent square PNG works best. Saved on this device for the desktop voice panel.",
+  "c4b7c4763116bb3d": "Choose avatar",
+  "deef9525ffdd3d4c": "Could not save the avatar. Choose a valid image or free device storage."
 }

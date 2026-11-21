@@ -13,6 +13,7 @@ import { m } from "../i18n/messages";
 import { readPreparedConnection } from "../state/session";
 import { unlockedAudioContext } from "../threadNotifications";
 import { runEnvironmentSpeech } from "./runEnvironmentSpeech";
+import { readVoiceReplyAvatar } from "./voiceReplyAvatar";
 
 const isSynthesisError = Schema.is(SpeechSynthesisError);
 let playing: AudioBufferSourceNode | undefined;
@@ -53,7 +54,7 @@ export async function speak(
   if (mine !== generation) return;
   if ("threadId" in request)
     lastReply = { environmentId, threadId: request.threadId, at: Date.now() };
-  if (floating) return floating(audio);
+  if (floating) return floating(audio, readVoiceReplyAvatar());
   if (!context) return;
   const buffer = await context.decodeAudioData(audio.slice().buffer);
   if (mine !== generation) return;

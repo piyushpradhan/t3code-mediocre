@@ -1104,6 +1104,13 @@ export const DesktopAppleSpeechTranscribeInputSchema = Schema.Struct({
 export const SystemSettingsPaneSchema = Schema.Literals(["full-disk-access"]);
 export type SystemSettingsPane = typeof SystemSettingsPaneSchema.Type;
 
+export const VoiceReplyAvatar = Schema.NullOr(
+  Schema.String.check(
+    Schema.isMaxLength(400_000),
+    Schema.isPattern(/^data:image\/png;base64,[A-Za-z0-9+/]+=*$/),
+  ),
+);
+
 export interface DesktopBridge {
   getAppBranding: () => DesktopAppBranding | null;
   /** `null` until the desktop host has read the login shell's environment; ask again later. */
@@ -1112,7 +1119,7 @@ export interface DesktopBridge {
   getClientPlatform: () => string;
   restartAudioService?: () => Promise<boolean>;
   /** Plays a spoken reply in a floating panel with a visualizer and a stop button. */
-  playVoiceReply?: (audio: Uint8Array) => Promise<void>;
+  playVoiceReply?: (audio: Uint8Array, avatar?: typeof VoiceReplyAvatar.Type) => Promise<void>;
   stopVoiceReply?: () => Promise<void>;
   /** A floating recording panel naming where the recording will be sent. */
   showVoiceRecording?: (description: { title: string; project: string }) => Promise<void>;

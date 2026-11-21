@@ -197,6 +197,10 @@ app, the reply plays in a floating panel at the bottom right of your screen, abo
 other apps, with a live audio visualizer; in a browser, a notice shows instead.
 Starting a new dictation, or **Stop** on the panel or notice, ends playback. The switch is saved on this device only.
 
+To replace the desktop panel's avatar, open **Settings → Voice → Spoken replies → Voice avatar**
+and choose or drop a PNG, JPEG, or WebP under 5 MB. A transparent square PNG works best.
+The image is cropped to a square and saved only on this device. Remove it to restore the default face.
+
 Speech comes from a server you choose, set per environment under **Speech
 server**. Any server with an OpenAI-compatible speech API works: a local
 [Kokoro](https://github.com/remsky/Kokoro-FastAPI) or Piper server on the

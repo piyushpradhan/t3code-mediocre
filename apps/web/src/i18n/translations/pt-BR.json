@@ -12444,5 +12444,9 @@
   "27d76249d09eb69f": "Guia de revisão pronto",
   "faa3bb26abb39c93": "O guia de revisão falhou",
   "b7df38b7d8792d78": "Abrir guia",
-  "9e91e9a77b664e4e": "Não foi possível iniciar um guia de revisão"
+  "9e91e9a77b664e4e": "Não foi possível iniciar um guia de revisão",
+  "e18e2ce4a86a94c3": "Avatar de voz",
+  "015968b3a1324d65": "Solte um PNG, JPEG ou WebP com menos de 5 MB. Recomendamos um PNG quadrado transparente. Salvo neste dispositivo para o painel de voz do desktop.",
+  "c4b7c4763116bb3d": "Escolher avatar",
+  "deef9525ffdd3d4c": "Não foi possível salvar o avatar. Escolha uma imagem válida ou libere espaço no dispositivo."
 }

@@ -12440,5 +12440,9 @@
   "27d76249d09eb69f": "Guía de revisión lista",
   "faa3bb26abb39c93": "Falló la guía de revisión",
   "b7df38b7d8792d78": "Abrir guía",
-  "9e91e9a77b664e4e": "No se pudo iniciar una guía de revisión"
+  "9e91e9a77b664e4e": "No se pudo iniciar una guía de revisión",
+  "e18e2ce4a86a94c3": "Avatar de voz",
+  "015968b3a1324d65": "Arrastra un PNG, JPEG o WebP de menos de 5 MB. Se recomienda un PNG cuadrado transparente. Se guarda en este dispositivo para el panel de voz de escritorio.",
+  "c4b7c4763116bb3d": "Elegir avatar",
+  "deef9525ffdd3d4c": "No se pudo guardar el avatar. Elige una imagen válida o libera espacio en el dispositivo."
 }

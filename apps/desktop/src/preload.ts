@@ -118,7 +118,11 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
   getClientPlatform: () => clientPlatform,
   restartAudioService: () => ipcRenderer.invoke(IpcChannels.RESTART_AUDIO_SERVICE_CHANNEL),
-  playVoiceReply: (audio) => ipcRenderer.invoke(IpcChannels.PLAY_VOICE_REPLY_CHANNEL, audio),
+  playVoiceReply: (audio, avatar) =>
+    ipcRenderer.invoke(
+      IpcChannels.PLAY_VOICE_REPLY_CHANNEL,
+      avatar === undefined ? audio : { audio, avatar },
+    ),
   stopVoiceReply: () => ipcRenderer.invoke(IpcChannels.STOP_VOICE_REPLY_CHANNEL),
   showVoiceRecording: (description) =>
     ipcRenderer.invoke(IpcChannels.SHOW_VOICE_RECORDING_CHANNEL, description),

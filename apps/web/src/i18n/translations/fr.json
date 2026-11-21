@@ -12445,5 +12445,9 @@
   "27d76249d09eb69f": "Guide de revue prêt",
   "faa3bb26abb39c93": "Échec du guide de revue",
   "b7df38b7d8792d78": "Ouvrir le guide",
-  "9e91e9a77b664e4e": "Impossible de démarrer un guide de revue"
+  "9e91e9a77b664e4e": "Impossible de démarrer un guide de revue",
+  "e18e2ce4a86a94c3": "Avatar vocal",
+  "015968b3a1324d65": "Déposez un PNG, JPEG ou WebP de moins de 5 Mo. Un PNG carré transparent est recommandé. Enregistré sur cet appareil pour le panneau vocal du bureau.",
+  "c4b7c4763116bb3d": "Choisir un avatar",
+  "deef9525ffdd3d4c": "Impossible d’enregistrer l’avatar. Choisissez une image valide ou libérez de l’espace sur l’appareil."
 }

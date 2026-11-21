@@ -12452,5 +12452,9 @@
   "27d76249d09eb69f": "Granskningsguiden är klar",
   "faa3bb26abb39c93": "Granskningsguiden misslyckades",
   "b7df38b7d8792d78": "Öppna guiden",
-  "9e91e9a77b664e4e": "Kunde inte starta en granskningsguide"
+  "9e91e9a77b664e4e": "Kunde inte starta en granskningsguide",
+  "e18e2ce4a86a94c3": "Röstavatar",
+  "015968b3a1324d65": "Släpp en PNG, JPEG eller WebP under 5 MB. En kvadratisk PNG med genomskinlig bakgrund fungerar bäst. Sparas på den här enheten för skrivbordsappens röstpanel.",
+  "c4b7c4763116bb3d": "Välj avatar",
+  "deef9525ffdd3d4c": "Det gick inte att spara avataren. Välj en giltig bild eller frigör lagringsutrymme på enheten."
 }

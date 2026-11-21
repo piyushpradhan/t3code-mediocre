@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import { VoiceReplyAvatarSettings } from "./VoiceReplyAvatarSettings";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { m } from "~/i18n/messages";
 import {
@@ -569,6 +570,7 @@ function SpokenRepliesSection() {
   const environmentId = scope?.environment?.environmentId;
   return (
     <SettingsSection id="voice-spoken-replies" title={gt("Spoken replies")}>
+      <VoiceReplyAvatarSettings />
       <SettingsRow
         {...setting("speak-replies")}
         description={gt(
