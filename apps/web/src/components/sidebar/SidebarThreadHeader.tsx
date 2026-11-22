@@ -1,5 +1,5 @@
 import { useGT } from "gt-react";
-import { BoxesIcon, FolderPlusIcon, SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
+import { BoxesIcon, SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
 import {
   type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -16,7 +16,6 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 export interface SidebarThreadHeaderProps {
   hasProjects: boolean;
   projectScope: ReactNode;
-  onNewProject: () => void;
   /** Absent when no connected machine can create products. */
   onNewProduct?: (() => void) | undefined;
   onNewThread: (event: ReactMouseEvent) => void;
@@ -37,7 +36,6 @@ export interface SidebarThreadHeaderProps {
 export function SidebarThreadHeader({
   hasProjects,
   projectScope,
-  onNewProject,
   onNewProduct,
   onNewThread,
   newThreadDisabled,
@@ -105,9 +103,6 @@ export function SidebarThreadHeader({
         {hasProjects ? (
           <>
             {projectScope}
-            <SidebarHeaderIconButton label={gt("Add project")} onClick={onNewProject}>
-              <FolderPlusIcon />
-            </SidebarHeaderIconButton>
             {onNewProduct ? (
               <SidebarHeaderIconButton label={gt("Add product")} onClick={onNewProduct}>
                 <BoxesIcon />

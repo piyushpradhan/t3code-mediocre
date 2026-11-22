@@ -13,6 +13,7 @@ import * as HostProcess from "@t3tools/shared/HostProcess";
 import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
 import { causeErrorTag } from "@t3tools/shared/observability";
 import {
+  type AgentFeedbackMode,
   defaultInstanceIdForDriver,
   type ModelSelection,
   type OrchestrationV2AppThread,
@@ -296,6 +297,7 @@ interface ActiveOpenCodeTurn {
   readonly appThread: OrchestrationV2AppThread;
   readonly modelSelection: ModelSelection;
   readonly runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy;
+  readonly agentFeedback: AgentFeedbackMode;
   readonly providerTurnId: OrchestrationV2ProviderTurn["id"];
   readonly providerThreadId: OrchestrationV2ProviderTurn["providerThreadId"];
   readonly runOrdinal: number;
@@ -2522,6 +2524,7 @@ export const makeOpenCodeAdapterV2 = Effect.fn("makeOpenCodeAdapterV2")(function
             appThread: state.appThread,
             modelSelection: state.appThread.modelSelection,
             runtimePolicy: state.parentSubagent.parentTurn.runtimePolicy,
+            agentFeedback: state.parentSubagent.parentTurn.agentFeedback,
             providerTurnId,
             providerThreadId: providerTurn.providerThreadId,
             runOrdinal: state.parentSubagent.parentTurn.runOrdinal,
@@ -3526,6 +3529,7 @@ export const makeOpenCodeAdapterV2 = Effect.fn("makeOpenCodeAdapterV2")(function
                 model: turn.modelSelection.model,
                 productDirectories: turn.runtimePolicy.additionalDirectories,
                 productWorktree: turn.runtimePolicy.productWorktree,
+                agentFeedback: hasT3Mcp ? turn.agentFeedback : "off",
                 runtimePolicy: turn.runtimePolicy,
               }),
             ]
@@ -3799,6 +3803,7 @@ export const makeOpenCodeAdapterV2 = Effect.fn("makeOpenCodeAdapterV2")(function
                 appThread: turnInput.appThread,
                 modelSelection: turnInput.modelSelection,
                 runtimePolicy: turnInput.runtimePolicy,
+                agentFeedback: turnInput.agentFeedback ?? "off",
                 providerTurnId,
                 providerThreadId: turnInput.providerThread.id,
                 runOrdinal: turnInput.runOrdinal,
