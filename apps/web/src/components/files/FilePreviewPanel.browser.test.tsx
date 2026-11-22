@@ -121,6 +121,10 @@ vi.mock(import("~/browser/openFileInPreview"), async (original) => {
 vi.mock(import("./OfficeFilePreview"), () => ({
   OfficeFilePreview: ({ src }: { src: string }) => <div data-testid="office-preview">{src}</div>,
 }));
+// No px0 binary here, so these tests drive the surfaces it falls back to.
+vi.mock(import("./Px0FileSurface"), () => ({
+  Px0FileSurface: ({ fallback }: { fallback: () => ReactNode }) => <>{fallback()}</>,
+}));
 vi.mock(import("./FileBreadcrumbs"), () => ({ FileBreadcrumbs: () => <></> }));
 vi.mock(import("./FileBrowserPanel"), () => ({
   default: () => (
