@@ -119,7 +119,11 @@ import Migration0108 from "./Migrations/108_AgentFeedback.ts";
 import Migration0109 from "./Migrations/109_IssueTrackerAccounts.ts";
 import Migration0110 from "./Migrations/110_Workflows.ts";
 import Migration0111 from "./Migrations/111_SupersededRunAttemptIndex.ts";
-import Migration0112 from "./Migrations/112_ProjectionProjectsProductMembers.ts";
+import Migration0112 from "./Migrations/112_LayoutCommandApprovals.ts";
+import Migration0113 from "./Migrations/113_WorkflowSkippedRuns.ts";
+import Migration0114 from "./Migrations/114_WorkflowRunIndexes.ts";
+import Migration0115 from "./Migrations/115_WorkflowRunTags.ts";
+import Migration0116 from "./Migrations/116_ProjectionProjectsProductMembers.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -234,7 +238,11 @@ const migrationEntries = [
   [109, "IssueTrackerAccounts", Migration0109],
   [110, "Workflows", Migration0110],
   [111, "SupersededRunAttemptIndex", Migration0111],
-  [112, "ProjectionProjectsProductMembers", Migration0112],
+  [112, "LayoutCommandApprovals", Migration0112],
+  [113, "WorkflowSkippedRuns", Migration0113],
+  [114, "WorkflowRunIndexes", Migration0114],
+  [115, "WorkflowRunTags", Migration0115],
+  [116, "ProjectionProjectsProductMembers", Migration0116],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
@@ -325,7 +333,7 @@ const releaseForkMigrationIds = Effect.fn("releaseForkMigrationIds")(function* (
       SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'effect_sql_migrations'
     `;
   if (tables.length === 0) return;
-  const staleWhere = sql`(migration_id = 55 AND name = 'ProjectionThreadNote') OR (migration_id IN (86, 92, 96, 97, 99, 100, 101, 102, 103, 104, 106, 108, 109, 111) AND name = 'ProjectionProjectsProductMembers')`;
+  const staleWhere = sql`(migration_id = 55 AND name = 'ProjectionThreadNote') OR (migration_id IN (86, 92, 96, 97, 99, 100, 101, 102, 103, 104, 106, 108, 109, 111, 112) AND name = 'ProjectionProjectsProductMembers')`;
   // CLI startup may run read-only, so only write when a stale fork row exists.
   const stale = yield* sql`SELECT 1 FROM effect_sql_migrations WHERE ${staleWhere} LIMIT 1`;
   if (stale.length === 0) return;
