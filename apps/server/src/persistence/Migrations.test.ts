@@ -240,7 +240,7 @@ describe("runMigrations", () => {
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );
 
-  it.effect.each([86, 92, 96, 97, 99, 100, 101, 102, 103, 104, 106, 108, 109, 111, 112, 116])(
+  it.effect.each([86, 92, 96, 97, 99, 100, 101, 102, 103, 104, 106, 108, 109, 111, 112, 116, 118])(
     "upgrades a fork database that recorded products as migration %i",
     (forkId) =>
       Effect.gen(function* () {
