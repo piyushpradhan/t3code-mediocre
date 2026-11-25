@@ -95,7 +95,9 @@ describe("V2 preview upgrade", () => {
         [113, "WorkflowSkippedRuns"],
         [114, "WorkflowRunIndexes"],
         [115, "WorkflowRunTags"],
-        [116, "ProjectionProjectsProductMembers"],
+        [116, "ForkHistoryMembership"],
+        [117, "WorkflowMailSender"],
+        [118, "ProjectionProjectsProductMembers"],
       ]);
       assert.deepStrictEqual(yield* runMigrations(), []);
       assert.deepStrictEqual(yield* sql`SELECT * FROM orchestration_v2_legacy_imports`, imports);
@@ -234,7 +236,9 @@ describe("V2 preview upgrade", () => {
         [113, "WorkflowSkippedRuns"],
         [114, "WorkflowRunIndexes"],
         [115, "WorkflowRunTags"],
-        [116, "ProjectionProjectsProductMembers"],
+        [116, "ForkHistoryMembership"],
+        [117, "WorkflowMailSender"],
+        [118, "ProjectionProjectsProductMembers"],
       ]);
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );
