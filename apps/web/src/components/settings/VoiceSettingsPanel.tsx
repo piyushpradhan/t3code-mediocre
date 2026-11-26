@@ -37,6 +37,7 @@ import { resolveSpeechPostProcessingModelSelection } from "@t3tools/shared/serve
 import {
   cloudSpeechLanguages,
   recommendSpeechModels,
+  speechModelDownloadPercent,
   type SpeechRecommendationRole,
 } from "@t3tools/shared/speech";
 import {
@@ -233,6 +234,7 @@ function ModelCard(props: ModelCardProps) {
   const { model } = props;
   const downloading = model.state === "downloading" || model.state === "verifying";
   const progress = model.downloaded === undefined ? 0 : (model.downloaded / model.size) * 100;
+  const percent = speechModelDownloadPercent(model.downloaded ?? 0, model.size);
   return (
     <div className="@container/model px-3 py-3">
       <div
@@ -323,7 +325,7 @@ function ModelCard(props: ModelCardProps) {
                 aria-label={gt("{name} download progress", { name: model.name })}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                aria-valuenow={Math.round(progress)}
+                aria-valuenow={percent}
                 className="h-1 overflow-hidden rounded-full bg-muted"
               >
                 <div
@@ -334,7 +336,7 @@ function ModelCard(props: ModelCardProps) {
               <p className="mt-1 text-2xs text-muted-foreground">
                 {model.state === "verifying"
                   ? gt("Verifying download…")
-                  : gt("{percent}% downloaded", { percent: Math.round(progress) })}
+                  : gt("{percent}% downloaded", { percent })}
               </p>
             </div>
           ) : null}
