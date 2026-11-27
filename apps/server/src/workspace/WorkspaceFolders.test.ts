@@ -1,6 +1,7 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import { ProjectId, type ProjectTrackedFolder } from "@t3tools/contracts";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -91,6 +92,7 @@ it.layer(NodeServices.layer)("WorkspaceFolders", (it) => {
         "libs/inline/.git",
         "extra/repo/.git",
         "extra/joined/.git",
+        " notes",
         "notes",
         "src/svc/.git",
         "tree",
@@ -99,6 +101,9 @@ it.layer(NodeServices.layer)("WorkspaceFolders", (it) => {
         "../outside/.git",
       ]) {
         yield* fileSystem.makeDirectory(path.join(root, folder), { recursive: true });
+      }
+      if (!(yield* HostProcess.isWindows)) {
+        yield* fileSystem.makeDirectory(path.join(root, "trailing "), { recursive: true });
       }
       yield* fileSystem.symlink(outside, path.join(root, "linked"));
       yield* fileSystem.symlink(root, path.join(root, "self"));
@@ -141,7 +146,9 @@ it.layer(NodeServices.layer)("WorkspaceFolders", (it) => {
             // Entries that lead nowhere take none of the room the real ones need.
             ${Array.from({ length: 130 }, (_, index) => `{ "path": "gone-${index}" },`).join("")}
             { "path": "api", "name": "API" },
+            { "path": " notes", "name": "Intended" },
             { "path": "notes" },
+            { "path": "trailing /", "name": "TrailingSlash" },
             { "path": "../outside" },
             { "path": "gone" },
             { "path": "." },
@@ -159,6 +166,12 @@ it.layer(NodeServices.layer)("WorkspaceFolders", (it) => {
             path: path.join(root, "api"),
             name: "API",
             isGitRepository: true,
+            source: "code-workspace",
+          },
+          {
+            path: path.join(root, " notes"),
+            name: "Intended",
+            isGitRepository: false,
             source: "code-workspace",
           },
           {
