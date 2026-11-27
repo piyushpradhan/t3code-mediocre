@@ -371,6 +371,7 @@ export interface ProviderTurnStartServiceV2Shape {
     readonly runId: RunId;
     readonly attemptId: RunAttemptId;
     readonly rootNodeId: NodeId;
+    readonly message?: string;
   }) => Effect.Effect<void, ProviderTurnStartError | ProviderTurnStartRunStateMissingError>;
 }
 
@@ -2739,7 +2740,7 @@ export const layer: Layer.Layer<
     return ProviderTurnStartServiceV2.of({
       start: startWithWorkspaceLease,
       failStartingRun: Effect.fn("ProviderTurnStartService.failStartingRun")(
-        function* ({ threadId, runId, attemptId, rootNodeId }) {
+        function* ({ threadId, runId, attemptId, rootNodeId, message }) {
           const projection = yield* projectionStore.getTurnStartContext(threadId, runId);
           const run = projection.runs.find((candidate) => candidate.id === runId);
           if (
@@ -2769,7 +2770,7 @@ export const layer: Layer.Layer<
             item: {
               type: "error",
               title: "Turn failed to start",
-              failure: makeProviderFailure({ message: START_GAVE_UP_MESSAGE }),
+              failure: makeProviderFailure({ message: message ?? START_GAVE_UP_MESSAGE }),
             },
           });
         },
