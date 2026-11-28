@@ -1529,7 +1529,7 @@ export default function ChatView(props: ChatViewProps) {
         ].join(":");
   const {
     banner: usageLimitsBanner,
-    offered: usageLimitsOffered,
+    offered: providerOffersUsageLimits,
     open: openUsageLimits,
     clearFor: clearUsageLimitsFor,
   } = useUsageLimitsPanel({
@@ -1542,6 +1542,8 @@ export default function ChatView(props: ChatViewProps) {
     providers: providerStatuses,
     sources: serverConfig?.usageLimitSources ?? EMPTY_USAGE_LIMIT_SOURCES,
   });
+  // Updating a queued message saves `/usage-limits` as its text.
+  const usageLimitsOffered = providerOffersUsageLimits && !queuedRunEdit.isEditing;
   const {
     beginLocalDispatch,
     resetLocalDispatch,
@@ -2731,9 +2733,12 @@ export default function ChatView(props: ChatViewProps) {
       return next;
     });
   };
-  // While a question or approval owns the composer, its text answers that, not the agent.
+  // While a question, approval or queued edit owns the composer, its text belongs to that, not the next send.
   const freshSessionCommandAvailable =
-    freshSessionAvailable && activePendingApproval === null && pendingUserInputs.length === 0;
+    freshSessionAvailable &&
+    activePendingApproval === null &&
+    pendingUserInputs.length === 0 &&
+    !queuedRunEdit.isEditing;
   const composerDraftTargetKey = composerTargetKey(composerDraftTarget);
   const composerSendHeld = useComposerSendHeld(composerDraftTargetKey);
   const cancelHeldSendStable = useStableCallback(() => {
@@ -4061,6 +4066,10 @@ export default function ChatView(props: ChatViewProps) {
                                 onRestoreEditingQueuedAttachment={
                                   queuedRunEdit.restoreEditingAttachment
                                 }
+                                canMoveEditingQueuedMessageToStash={
+                                  queuedRunEdit.canMoveEditToStash
+                                }
+                                onMoveEditingQueuedMessageToStash={queuedRunEdit.removeEditedRun}
                               />
                             )}
                           </div>

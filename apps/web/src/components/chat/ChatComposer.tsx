@@ -494,6 +494,8 @@ export interface ChatComposerProps {
   removedEditingQueuedAttachments?: ReadonlyArray<QueuedAttachmentContextBinding> | undefined;
   onRemoveEditingQueuedAttachment: (attachmentId: string) => void;
   onRestoreEditingQueuedAttachment?: ((attachment: ContractChatAttachment) => void) | undefined;
+  canMoveEditingQueuedMessageToStash?: boolean | undefined;
+  onMoveEditingQueuedMessageToStash?: (() => void) | undefined;
 
   onCompactContext: () => void;
   onSend: (
@@ -637,6 +639,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     removedEditingQueuedAttachments,
     onRemoveEditingQueuedAttachment,
     onRestoreEditingQueuedAttachment,
+    canMoveEditingQueuedMessageToStash,
+    onMoveEditingQueuedMessageToStash,
   } = props;
   const {
     activePendingProgress: incomingPendingProgress,
@@ -2628,6 +2632,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       keybindings,
       getShortcutContext,
       sendShortcut: settings.sendShortcut,
+      composerRichTextEnabled: settings.composerRichTextEnabled,
       routeKind,
       phase,
       canSteer,
@@ -2701,6 +2706,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     setComposerTrigger,
     importContextRecords,
     expandMobileComposer: expandMobileComposerStable,
+    editingQueuedMessage:
+      activeEditingQueuedAttachments !== null && onMoveEditingQueuedMessageToStash
+        ? {
+            canMoveToStash: canMoveEditingQueuedMessageToStash === true,
+            onMovedToStash: onMoveEditingQueuedMessageToStash,
+          }
+        : null,
   });
   const hasBlockingComposerTopDrawer = pendingUserInputs.length > 0;
   const composerControlsCollapsed = isComposerCollapsedMobile;
@@ -2797,8 +2809,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   // An open question owns the space above the composer. Only a machine problem,
   // which is why an answer could not go through, stays beside it.
   const replyTo = composerDraft?.replyTo ?? null;
+  // A send waits for compressing images, so they count as attached.
   const holdsNoAttachedContext =
-    composerImages.length + composerFiles.length === 0 &&
+    composerImages.length + composerFiles.length + allPreparingComposerImages.length === 0 &&
     composerSendState.sendableTerminalContexts.length === 0 &&
     composerPreviewAnnotations.length === 0 &&
     composerReviewComments.length === 0 &&
@@ -2807,6 +2820,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const codexFeedbackOffered = selectedProvider === "codex" && multipleModelSelections === null;
   const commandRunsLocally = composerRunsDraftLocally({
     text: prompt,
+    commandText: composerSendState.trimmedPrompt,
     holdsOnlyText: holdsNoAttachedContext && replyTo === null,
     sideChat: props.sideChatAvailable === true || (props.sideChatDisabledReason ?? null) !== null,
     usageLimits: props.onUsageLimitsCommand !== undefined,
@@ -2815,7 +2829,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   });
   // `/feedback` runs with a pending reply too, which then stays in the bar.
   const feedbackRunsLocally =
-    codexFeedbackOffered && holdsNoAttachedContext && parseCodexFeedbackCommand(prompt) !== null;
+    codexFeedbackOffered &&
+    holdsNoAttachedContext &&
+    parseCodexFeedbackCommand(composerSendState.trimmedPrompt) !== null;
   const draftRunsLocally = commandRunsLocally || feedbackRunsLocally;
   const replyBannerItems: readonly ComposerBannerStackItem[] = replyTo
     ? [
