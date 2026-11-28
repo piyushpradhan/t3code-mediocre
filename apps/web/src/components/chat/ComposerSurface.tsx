@@ -21,8 +21,7 @@ function Shell({
         "before:pointer-events-none before:absolute before:inset-0 before:z-0 before:rounded-2xl before:bg-(--chat-composer-glass-surface)/(--glass-opacity) before:backdrop-blur-(--glass-blur) before:backdrop-saturate-(--glass-saturation)",
         "not-supports-[((backdrop-filter:blur(1px))_or_(-webkit-backdrop-filter:blur(1px)))]:before:bg-(--chat-composer-glass-surface)",
         "has-data-[composer-banner-surface=attached]:before:hidden",
-        // With a context row below, the card paints its own glass (see Host) so the row stays bare.
-        "data-context-row:before:hidden",
+        "data-context-row:surface-glass data-context-row:rounded-2xl data-context-row:before:hidden",
         className,
       )}
       {...props}
@@ -68,13 +67,13 @@ function Main({ className, ...props }: ComponentProps<"div">) {
   );
 }
 
-/** A row under the card (environment, worktree, branch); page-coloured glass hides the timeline scrolling behind it. */
+/** A row under the card (environment, worktree, branch). */
 function ContextStrip({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       data-slot="composer-context-strip"
       className={cn(
-        "group/composer-context surface-glass relative flex w-full items-center gap-2 overflow-x-clip px-2 pt-2 text-muted-foreground",
+        "group/composer-context relative flex w-full items-center gap-2 overflow-x-clip px-2 pt-2 text-muted-foreground",
         className,
       )}
       {...props}
