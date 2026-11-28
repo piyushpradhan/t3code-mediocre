@@ -119,6 +119,13 @@ function hasCurrentProviderWorkspaceSnapshot(
   );
 }
 
+// The agent reloads skills on these, but the composer's per-cwd skill list is cached separately.
+const SKILL_RELOAD_COMMANDS = new Set(["/reload-skills", "/reload-plugins"]);
+
+export function isSkillReloadCommand(prompt: string): boolean {
+  return SKILL_RELOAD_COMMANDS.has(prompt.trim().toLowerCase());
+}
+
 export function resolveProviderSkillsForCwd(
   provider: ServerProvider,
   cwd: string | null | undefined,
@@ -396,6 +403,7 @@ const skillCategoryTerms = {
 export function providerSkillCategory(skill: ServerProviderSkill): string {
   const text = `${skill.name} ${skill.shortDescription ?? skill.description ?? ""}`;
   return (
+    // oxlint-disable-next-line t3code/no-untranslated-copy -- category key, matching the untranslated skillCategoryTerms keys
     Object.entries(skillCategoryTerms).find(([, pattern]) => pattern.test(text))?.[0] ?? "Other"
   );
 }

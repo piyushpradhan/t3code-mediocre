@@ -18,6 +18,7 @@ import {
   VOICE_RECORDING_STOP_CHANNEL,
   VOICE_REPLY_SHORTCUT_CHANNEL,
 } from "../channels.ts";
+import { VOICE_REPLY_FACE_SVG } from "./voiceReplyFace.ts";
 
 const WIDTH = 252;
 const HEIGHT = 52;
@@ -67,17 +68,15 @@ const OVERLAY_HTML = `<!doctype html><meta http-equiv="Content-Security-Policy" 
 <style>
 html,body{margin:0;height:100%;overflow:hidden;background:transparent;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;user-select:none}
 #pill{position:absolute;inset:0;display:flex;align-items:center;gap:10px;padding:0 8px;border-radius:999px;background:#18181b;-webkit-app-region:drag}
-#face{position:relative;flex:none;width:36px;height:36px;border-radius:999px;background:linear-gradient(145deg,#a78bfa,#6366f1)}
-#face img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+#face{flex:none;width:36px;height:36px;overflow:hidden;border-radius:999px;background:#fff}
+#face>*{display:block;width:100%;height:100%;object-fit:cover}
 #face:has(img){background:transparent}
-.eye{position:absolute;top:13px;width:4px;height:6px;border-radius:2px;background:#fff}
-#mouth{position:absolute;left:13px;top:23px;width:10px;height:2px;border-radius:5px;background:#fff}
 canvas{flex:1;min-width:0;height:28px}
 button{-webkit-app-region:no-drag;flex:none;display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:999px;background:rgba(255,255,255,.12);cursor:pointer}
 button:hover{background:rgba(255,255,255,.2)}
 button span{width:11px;height:11px;border-radius:2px;background:#fff}
 </style>
-<div id="pill"><div id="face" aria-hidden="true"><span class="eye" style="left:11px"></span><span class="eye" style="left:21px"></span><span id="mouth"></span></div><canvas id="bars" aria-hidden="true"></canvas><button id="stop" title="Stop reading" aria-label="Stop reading"><span></span></button></div>
+<div id="pill"><div id="face" aria-hidden="true">${VOICE_REPLY_FACE_SVG}</div><canvas id="bars" aria-hidden="true"></canvas><button id="stop" title="Stop reading" aria-label="Stop reading"><span></span></button></div>
 <script>
 const stop=()=>window.close();
 document.getElementById("stop").onclick=stop;
@@ -97,13 +96,12 @@ window.play=async (base64,avatar)=>{
   const canvas=document.getElementById("bars"),g=canvas.getContext("2d"),ratio=devicePixelRatio;
   canvas.width=canvas.clientWidth*ratio;canvas.height=canvas.clientHeight*ratio;
   const data=new Uint8Array(analyser.frequencyBinCount),count=24,gap=3*ratio,bar=(canvas.width-gap*(count-1))/count;
-  const eyes=document.querySelectorAll(".eye"),mouth=document.getElementById("mouth")?.style;
+  const mouth=document.getElementById("mouth"),jaw=document.getElementById("jaw");
   g.fillStyle="#fff";
-  const draw=time=>{
+  const draw=()=>{
     analyser.getByteFrequencyData(data);
     const level=(data[1]+data[2]+data[3]+data[4])/1020;
-    if(mouth)mouth.height=2+level*9+"px";
-    for(const eye of eyes)eye.style.transform=(time%3600)<120?"scaleY(.2)":"";
+    if(mouth){mouth.setAttribute("ry",level*9);jaw.setAttribute("transform","translate(0 "+level*12+")")}
     g.clearRect(0,0,canvas.width,canvas.height);
     for(let i=0;i<count;i++){
       const h=Math.max(bar,(data[1+Math.round(Math.abs(i-(count-1)/2))]/255)*canvas.height);
