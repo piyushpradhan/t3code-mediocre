@@ -441,15 +441,16 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   }
 }
 
+/* !important in this layer beats a theme's unlayered !important backgrounds, so the picture shows. */
 @utility wallpaper-clear {
   html[data-appearance-background] & {
-    background: transparent;
+    background: transparent !important;
   }
 }
 
 @utility wallpaper-glass {
   html[data-appearance-background] & {
-    background: color-mix(in srgb, var(--background) var(--glass-opacity), transparent);
+    background: color-mix(in srgb, var(--background) var(--glass-opacity), transparent) !important;
     -webkit-backdrop-filter: blur(var(--glass-blur));
     backdrop-filter: blur(var(--glass-blur));
 
@@ -461,7 +462,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 
 @utility wallpaper-sidebar {
   html[data-appearance-background] & {
-    background: color-mix(in srgb, var(--sidebar) var(--glass-opacity), transparent);
+    background: color-mix(in srgb, var(--sidebar) var(--glass-opacity), transparent) !important;
     -webkit-backdrop-filter: blur(var(--glass-blur));
     backdrop-filter: blur(var(--glass-blur));
 
